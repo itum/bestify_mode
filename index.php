@@ -855,6 +855,30 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         );
         $ManagePanel->Modifyuser($user['Processing_value'], $nameloc['Service_location'], $config);
     }
+    
+    // پیام موفقیت‌آمیز بودن تمدید سرویس
+    $keyboard_back = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔄 مشاهده اطلاعات سرویس", 'callback_data' => "product_" . $user['Processing_value']],
+                ['text' => "🏠 بازگشت به لیست سرویس ها", 'callback_data' => "backorder"]
+            ]
+        ]
+    ]);
+    
+    // متن پیام تمدید موفق
+    $success_message = "✅ عملیات تمدید سرویس با موفقیت انجام شد
+
+🔰 اطلاعات تمدید:
+👤 نام کاربری: <code>" . $user['Processing_value'] . "</code>
+📦 نام محصول: " . $product['name_product'] . "
+⏱ مدت زمان: " . $product['Service_time'] . " روز
+💾 حجم: " . $product['Volume_constraint'] . " گیگابایت
+💰 مبلغ پرداختی: " . number_format($product['price_product']) . " تومان
+
+" . $textbotlang['users']['extend']['thanks'];
+    
+    sendmessage($from_id, $success_message, $keyboard_back, 'HTML');
 } elseif (preg_match('/buyservice-(\w+)/', $datain, $dataget)) {
     deletemessage($from_id, $message_id);
     $id_product = $dataget[1];
