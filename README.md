@@ -1,6 +1,6 @@
 # 🚀 Bestify Mode
 
-سیستم مدیریت پیشرفته فروش خدمات VPN با پشتیبانی از چندین پنل
+Advanced VPN Service Management System with Multi-Panel Support
 
 <p align="center">
     <img src="https://img.shields.io/badge/Version-1.0.0-blue?style=flat-square" alt="Version"/>
@@ -11,88 +11,88 @@
 
 ---
 
-## 📑 فهرست مطالب
+## 📑 Table of Contents
 
-- [✨ معرفی](#-معرفی)
-- [⚙️ امکانات](#️-امکانات)
-- [🚀 نصب و راه‌اندازی](#-نصب-و-راه‌اندازی)
-  - [پیش‌نیازها](#-پیش‌نیازها)
-  - [نصب برنامه](#-نصب-برنامه)
-  - [به‌روزرسانی](#-به‌روزرسانی)
-  - [حذف کامل](#-حذف-کامل)
+- [✨ Overview](#-overview)
+- [⚙️ Features](#️-features)
+- [🚀 Installation](#-installation)
+  - [Prerequisites](#-prerequisites)
+  - [Setup](#-setup)
+  - [Updates](#-updates)
+  - [Uninstallation](#-uninstallation)
 - [👨‍💻 Private Repository Access](#-private-repository-access)
-- [🔄 مدیریت نسخه‌ها](#-مدیریت-نسخه‌ها)
+- [🔄 Version Management](#-version-management)
 
 ---
 
-## ✨ معرفی
+## ✨ Overview
 
-**Bestify Mode** یک سیستم مدیریت پیشرفته برای فروش خدمات VPN است که با هدف ساده‌سازی فرایند‌های مدیریت کاربران، پرداخت‌ها، و ارائه خدمات طراحی شده است. این سیستم با پنل‌های مختلف مانند **Marzban** و **X-UI** سازگار است و یک رابط کاربری یکپارچه برای مدیریت تمام جنبه‌های کسب‌وکار VPN ارائه می‌دهد.
-
----
-
-## ⚙️ امکانات
-
-### 🔹 **ویژگی‌های اصلی**
-
-- ✅ مدیریت یکپارچه کاربران
-- ✅ سیستم پرداخت چندگانه
-- ✅ پشتیبانی از پنل‌های متنوع
-- ✅ ساخت خودکار تنظیمات
-- ✅ مدیریت اشتراک‌ها و تمدید خودکار
-- ✅ گزارش‌های تحلیلی و آماری
-- ✅ رابط کاربری ادمین پیشرفته
-- ✅ سیستم مدیریت پشتیبانی کاربران
-- ✅ سیستم تیکت و پشتیبانی
-- ✅ سیستم نمایندگی و زیرمجموعه‌ها
-- ✅ مدیریت پهنای باند
-- ✅ سیستم هشدار و اطلاع‌رسانی
-- ✅ امکان شخصی‌سازی کامل متون و رابط کاربری
+**Bestify Mode** is an advanced management system for VPN services designed to simplify user management, payment processing, and service delivery. The system is compatible with various panels such as **Marzban** and **X-UI**, providing an integrated interface for managing all aspects of your VPN business.
 
 ---
 
-## 🚀 نصب و راه‌اندازی
+## ⚙️ Features
 
-### 📋 پیش‌نیازها
+### 🔹 **Core Features**
 
-برای نصب Bestify Mode، موارد زیر مورد نیاز است:
-- 🖥️ **سرور Ubuntu 20.04 یا بالاتر**
-- 🌐 **یک دامنه یا ساب‌دامنه**
-- 🔑 **دسترسی به ریپوزیتوری خصوصی**
+- ✅ Integrated user management
+- ✅ Multiple payment system support
+- ✅ Various panel compatibility
+- ✅ Automatic configuration generation
+- ✅ Subscription management and auto-renewal
+- ✅ Analytical and statistical reporting
+- ✅ Advanced admin interface
+- ✅ User support management
+- ✅ Ticket and support system
+- ✅ Reseller and sub-user system
+- ✅ Bandwidth management
+- ✅ Alert and notification system
+- ✅ Fully customizable text and interface
 
-### 💻 نصب برنامه
+---
 
-برای نصب، دستور زیر را در ترمینال سرور خود اجرا کنید:
+## 🚀 Installation
+
+### 📋 Prerequisites
+
+To install Bestify Mode, you'll need:
+- 🖥️ **Ubuntu Server 20.04 or higher**
+- 🌐 **A domain or subdomain**
+- 🔑 **Access to the private repository**
+
+### 💻 Setup
+
+To install, run the following command in your server terminal:
 
 ```bash
 bash <(curl -s https://example.com/path/to/install.sh)
 ```
 
-**توجه**: نصب این سیستم نیازمند دسترسی به ریپوزیتوری خصوصی است. برای دریافت راهنمایی درباره تنظیم کلید SSH، به بخش [Private Repository Access](#-private-repository-access) مراجعه کنید.
+**Note**: Installing this system requires access to the private repository. For guidance on setting up SSH keys, refer to the [Private Repository Access](#-private-repository-access) section.
 
 ---
 
-### 🔄 به‌روزرسانی
+### 🔄 Updates
 
-برای به‌روزرسانی سیستم به آخرین نسخه، دستور زیر را اجرا کنید:
+To update the system to the latest version, run:
 
 ```bash
 cd /var/www/bestify_mode && bash install.sh -update
 ```
 
-همچنین می‌توانید برای به‌روزرسانی خودکار، گزینه مربوطه را در منوی نصب انتخاب کنید.
+You can also set up automatic updates by selecting the relevant option in the installation menu.
 
 ---
 
-### ❌ حذف کامل
+### ❌ Uninstallation
 
-برای حذف کامل سیستم از سرور، دستور زیر را اجرا کنید:
+To completely remove the system from your server, run:
 
 ```bash
 cd /var/www/bestify_mode && bash install.sh
 ```
 
-سپس گزینه 5 (حذف Bestify Mode) را انتخاب کنید.
+Then select option 5 (Remove Bestify Mode).
 
 ---
 
@@ -153,7 +153,7 @@ ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
 ### 6. Test Connection
 
 ```bash
-ssh-T git@github.com
+ssh -T git@github.com
 ```
 
 You should see a message confirming successful authentication.
@@ -171,22 +171,22 @@ Contact the repository administrator to request access if needed.
 
 ---
 
-## 🔄 مدیریت نسخه‌ها
+## 🔄 Version Management
 
-Bestify Mode با استفاده از سیستم تگ‌های Git، نسخه‌های مختلفی ارائه می‌دهد. برای مشاهده نسخه‌های موجود:
+Bestify Mode uses Git tags to provide different versions. To view available versions:
 
 ```bash
 cd /var/www/bestify_mode && bash install.sh -version
 ```
 
-برای تغییر به یک نسخه خاص، از طریق منوی نصب، گزینه 3 را انتخاب کرده و شماره نسخه مورد نظر را وارد کنید.
+To switch to a specific version, select option 3 from the installation menu and enter the desired version number.
 
-### انتشار نسخه‌ها
+### Release Versions
 
-- **v1.0.0**: نسخه اولیه (پایدار)
-- **v1.1.0**: بهبود عملکرد و افزودن ویژگی‌های جدید
-- **v1.2.0**: رفع باگ‌ها و بهبود امنیت
+- **v1.0.0**: Initial stable release
+- **v1.1.0**: Performance improvements and new features
+- **v1.2.0**: Bug fixes and security enhancements
 
 ---
 
-توسعه‌داده شده توسط تیم Bestify Mode &copy; 2023-2024
+Developed by Bestify Mode Team &copy; 2023-2024
