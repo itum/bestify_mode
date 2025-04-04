@@ -65,7 +65,7 @@ To install Bestify Mode, you'll need:
 To install, run the following command in your server terminal:
 
 ```bash
-bash <(curl -s https://example.com/path/to/install.sh)
+curl -o install.sh -L https://raw.githubusercontent.com/itum/bestify_mode/main/install.sh && bash install.sh
 ```
 
 **Note**: Installing this system requires access to the private repository. For guidance on setting up SSH keys, refer to the [Private Repository Access](#-private-repository-access) section.
