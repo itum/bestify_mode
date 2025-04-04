@@ -110,10 +110,13 @@ try {
                 $discounted_price = $service_price - ($service_price * $discount_percent / 100);
             }
             
+            // قیمت نهایی که باید پرداخت شود (با یا بدون تخفیف)
+            $final_price = $is_agent ? $discounted_price : $service_price;
+            
             // اگر کاربر موجودی کافی داشت، سرویس را تمدید کنیم
-            if ($user_balance >= $discounted_price) {
+            if ($user_balance >= $final_price) {
                 // کسر موجودی از کیف پول کاربر
-                $new_balance = $user_balance - $discounted_price;
+                $new_balance = $user_balance - $final_price;
                 $stmt = $pdo->prepare("UPDATE user SET Balance = ? WHERE id = ?");
                 $stmt->execute([$new_balance, $id_user]);
                 
@@ -168,7 +171,7 @@ try {
 💾 حجم: {$service['Volume_constraint']} گیگابایت
 💰 قیمت اصلی: " . number_format($service_price) . " تومان
 🎁 تخفیف نمایندگی: $discount_percent درصد
-💵 مبلغ پرداختی: " . number_format($discounted_price) . " تومان
+💵 مبلغ پرداختی: " . number_format($final_price) . " تومان
 
 📌 این تمدید به صورت خودکار انجام شده و مبلغ آن از کیف پول شما کسر شده است.";
                 } else {
@@ -196,15 +199,21 @@ try {
                 sendmessage($id_user, $success_message, $keyboard_back, 'HTML');
             } else {
                 // اگر موجودی کافی نبود، به کاربر اطلاع دهیم
-                $shortage = $discounted_price - $user_balance;
+                $shortage = $final_price - $user_balance;
+                
+                $payment_info = $is_agent ? 
+                    "💰 موجودی فعلی شما: " . number_format($user_balance) . " تومان
+💲 مبلغ مورد نیاز: " . number_format($final_price) . " تومان (با اعمال $discount_percent% تخفیف نمایندگی)
+⚠️ کمبود اعتبار: " . number_format($shortage) . " تومان" :
+                    "💰 موجودی فعلی شما: " . number_format($user_balance) . " تومان
+💲 مبلغ مورد نیاز: " . number_format($service_price) . " تومان
+⚠️ کمبود اعتبار: " . number_format($shortage) . " تومان";
                 
                 $message = "⚠️ سرویس «$username» شما منقضی شده و نیاز به تمدید دارد.
 
 📌 با توجه به اینکه تمدید خودکار برای این سرویس فعال است، سیستم قصد داشت آن را به‌طور خودکار تمدید کند، اما موجودی کیف پول شما کافی نیست.
 
-💰 موجودی فعلی شما: " . number_format($user_balance) . " تومان
-💲 مبلغ مورد نیاز: " . number_format($discounted_price) . " تومان
-⚠️ کمبود اعتبار: " . number_format($shortage) . " تومان
+$payment_info
 
 لطفاً کیف پول خود را شارژ کنید تا سرویس شما تمدید شود.";
                 
