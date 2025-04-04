@@ -866,8 +866,41 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         ]
     ]);
     
+    // بررسی آیا کاربر نماینده است
+    $is_agent = false;
+    $discount_percent = 0;
+    $discounted_price = $product['price_product'];
+    
+    // چک کردن وجود کاربر در جدول نمایندگان
+    $stmt = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'active'");
+    $stmt->bindValue(':user_id', $from_id);
+    $stmt->execute();
+    $agency_data = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($agency_data) {
+        $is_agent = true;
+        $discount_percent = $agency_data['discount_percent'];
+        $discounted_price = $product['price_product'] - ($product['price_product'] * ($discount_percent / 100));
+    }
+    
     // متن پیام تمدید موفق
-    $success_message = "✅ عملیات تمدید سرویس با موفقیت انجام شد
+    if ($is_agent) {
+        // پیام برای نماینده با نمایش قیمت با تخفیف
+        $success_message = "✅ عملیات تمدید سرویس با موفقیت انجام شد
+
+🔰 اطلاعات تمدید:
+👤 نام کاربری: <code>" . $user['Processing_value'] . "</code>
+📦 نام محصول: " . $product['name_product'] . "
+⏱ مدت زمان: " . $product['Service_time'] . " روز
+💾 حجم: " . $product['Volume_constraint'] . " گیگابایت
+💰 قیمت اصلی: " . number_format($product['price_product']) . " تومان
+🎁 تخفیف نمایندگی: " . $discount_percent . " درصد
+💵 مبلغ پرداختی: " . number_format($discounted_price) . " تومان
+
+" . $textbotlang['users']['extend']['thanks'];
+    } else {
+        // پیام برای کاربر عادی
+        $success_message = "✅ عملیات تمدید سرویس با موفقیت انجام شد
 
 🔰 اطلاعات تمدید:
 👤 نام کاربری: <code>" . $user['Processing_value'] . "</code>
@@ -877,6 +910,7 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
 💰 مبلغ پرداختی: " . number_format($product['price_product']) . " تومان
 
 " . $textbotlang['users']['extend']['thanks'];
+    }
     
     sendmessage($from_id, $success_message, $keyboard_back, 'HTML');
 } elseif (preg_match('/buyservice-(\w+)/', $datain, $dataget)) {
