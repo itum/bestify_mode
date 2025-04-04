@@ -20,7 +20,7 @@
   - [نصب برنامه](#-نصب-برنامه)
   - [به‌روزرسانی](#-به‌روزرسانی)
   - [حذف کامل](#-حذف-کامل)
-- [👨‍💻 دسترسی به ریپوزیتوری خصوصی](#-دسترسی-به-ریپوزیتوری-خصوصی)
+- [👨‍💻 Private Repository Access](#-private-repository-access)
 - [🔄 مدیریت نسخه‌ها](#-مدیریت-نسخه‌ها)
 
 ---
@@ -68,7 +68,7 @@
 bash <(curl -s https://example.com/path/to/install.sh)
 ```
 
-**توجه**: نصب این سیستم نیازمند دسترسی به ریپوزیتوری خصوصی است. برای دریافت راهنمایی درباره تنظیم کلید SSH، به بخش [دسترسی به ریپوزیتوری خصوصی](#-دسترسی-به-ریپوزیتوری-خصوصی) مراجعه کنید.
+**توجه**: نصب این سیستم نیازمند دسترسی به ریپوزیتوری خصوصی است. برای دریافت راهنمایی درباره تنظیم کلید SSH، به بخش [Private Repository Access](#-private-repository-access) مراجعه کنید.
 
 ---
 
@@ -96,26 +96,78 @@ cd /var/www/bestify_mode && bash install.sh
 
 ---
 
-## 👨‍💻 دسترسی به ریپوزیتوری خصوصی
+## 👨‍💻 Private Repository Access
 
-Bestify Mode یک پروژه خصوصی است و برای دسترسی به ریپوزیتوری آن، نیاز به تنظیم کلید SSH دارید:
+Bestify Mode is a private project that requires SSH key access to the repository. Follow these steps to set up access:
 
-1. **ایجاد کلید SSH جدید**:
+### 1. Generate SSH Key
+
+Create a new SSH key on your server:
+
 ```bash
-ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_bestify
+# Create SSH directory if it doesn't exist
+mkdir -p ~/.ssh
+chmod 700 ~/.ssh
+
+# Generate new SSH key
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_bestify -N ""
+
+# Set proper permissions
+chmod 600 ~/.ssh/id_rsa_bestify
 ```
 
-2. **اضافه کردن کلید عمومی به حساب GitHub**:
-   - محتوای فایل `~/.ssh/id_rsa_bestify.pub` را کپی کنید
-   - به حساب GitHub خود بروید: Settings > SSH and GPG keys > New SSH key
-   - کلید عمومی خود را اضافه کنید
+### 2. Display and Copy Public Key
 
-3. **تنظیم SSH Config**:
+Show your public key and copy it:
+
+```bash
+cat ~/.ssh/id_rsa_bestify.pub
+```
+
+### 3. Add Key to GitHub
+
+Add the public key to the repository:
+
+- Go to the GitHub repository Settings
+- Navigate to "Deploy keys"
+- Click "Add deploy key"
+- Paste your public key and give it a name
+- Check "Allow write access" if needed
+- Click "Add key"
+
+### 4. Configure SSH
+
+Create or update your SSH config file:
+
 ```bash
 echo -e "Host github.com\n  IdentityFile ~/.ssh/id_rsa_bestify\n  User git" >> ~/.ssh/config
+chmod 600 ~/.ssh/config
 ```
 
-برای درخواست دسترسی به ریپوزیتوری، با مدیر پروژه تماس بگیرید.
+### 5. Add GitHub to Known Hosts
+
+```bash
+ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+```
+
+### 6. Test Connection
+
+```bash
+ssh-T git@github.com
+```
+
+You should see a message confirming successful authentication.
+
+### 7. Clone Repository
+
+After setting up SSH access, you can clone the repository:
+
+```bash
+sudo mkdir -p /var/www
+sudo GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_bestify" git clone git@github.com:username/bestify_mode.git /var/www/bestify_mode
+```
+
+Contact the repository administrator to request access if needed.
 
 ---
 
