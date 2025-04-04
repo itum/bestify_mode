@@ -1,199 +1,455 @@
 #!/bin/bash
 
+# Bestify Mode Installation Script
+# For private repository access and management
+
+# Colors for terminal output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
 # Checking Root Access
 if [[ $EUID -ne 0 ]]; then
-    echo -e "\033[31m[ERROR]\033[0m Please run this script as \033[1mroot\033[0m."
+    echo -e "${RED}[ERROR]${NC} Please run this script as ${BLUE}root${NC}."
     exit 1
 fi
 
 # Display Logo
 function show_logo() {
     clear
-    echo -e "\033[1;34m"
+    echo -e "${BLUE}"
     echo "========================================"
-    echo "           MIRZA INSTALL SCRIPT         "
+    echo "          BESTIFY MODE INSTALLER        "
     echo "========================================"
-    echo -e "\033[0m"
+    echo -e "${NC}"
     echo ""
 }
 
-# Display Menu
+# Configuration variables
+REPO_URL="git@github.com:username/bestify_mode.git"
+INSTALL_DIR="/var/www/bestify_mode"
+SSH_KEY_DIR="/root/.ssh"
+SSH_KEY_FILE="${SSH_KEY_DIR}/id_rsa_bestify"
+KNOWN_HOSTS_FILE="${SSH_KEY_DIR}/known_hosts"
+CONFIG_FILE="${SSH_KEY_DIR}/config"
+
+# Check dependencies
+function check_dependencies() {
+    echo -e "${BLUE}[INFO]${NC} Checking dependencies..."
+    
+    DEPS=(git curl wget unzip)
+    MISSING=()
+    
+    for DEP in "${DEPS[@]}"; do
+        if ! command -v $DEP &> /dev/null; then
+            MISSING+=($DEP)
+        fi
+    done
+    
+    if [ ${#MISSING[@]} -ne 0 ]; then
+        echo -e "${YELLOW}[WARNING]${NC} Missing dependencies: ${MISSING[*]}"
+        echo -e "${BLUE}[INFO]${NC} Installing missing dependencies..."
+        apt update
+        apt install -y ${MISSING[*]}
+    else
+        echo -e "${GREEN}[SUCCESS]${NC} All dependencies are installed."
+    fi
+}
+
+# Setup SSH key for private repository access
+function setup_ssh_key() {
+    echo -e "${BLUE}[INFO]${NC} Setting up SSH for private repository access..."
+    
+    # Create SSH directory if it doesn't exist
+    mkdir -p $SSH_KEY_DIR
+    chmod 700 $SSH_KEY_DIR
+    
+    # Check if SSH key already exists
+    if [ ! -f "$SSH_KEY_FILE" ]; then
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} SSH key for repository access not found."
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Do you want to:"
+        echo "1) Generate a new SSH key"
+        echo "2) Enter an existing private key"
+        read -p "Select option [1-2]: " ssh_option
+        
+        case $ssh_option in
+            1)
+                echo -e "${BLUE}[INFO]${NC} Generating new SSH key for repository access..."
+                ssh-keygen -t rsa -b 4096 -f $SSH_KEY_FILE -N ""
+                echo -e "${GREEN}[SUCCESS]${NC} SSH key generated. Please add this public key to your GitHub repository:"
+                cat "${SSH_KEY_FILE}.pub"
+                echo ""
+                echo -e "${YELLOW}[ACTION REQUIRED]${NC} After adding the key to GitHub, press Enter to continue..."
+                read
+                ;;
+            2)
+                echo -e "${YELLOW}[INPUT NEEDED]${NC} Please paste your private SSH key (press Ctrl+D when done):"
+                cat > $SSH_KEY_FILE
+                chmod 600 $SSH_KEY_FILE
+                ;;
+            *)
+                echo -e "${RED}[ERROR]${NC} Invalid option. Exiting..."
+                exit 1
+                ;;
+        esac
+    else
+        echo -e "${GREEN}[SUCCESS]${NC} SSH key already exists."
+    fi
+    
+    # Set proper permissions
+    chmod 600 $SSH_KEY_FILE
+    
+    # Add GitHub to known hosts if not already added
+    if ! grep -q "github.com" $KNOWN_HOSTS_FILE 2>/dev/null; then
+        ssh-keyscan -t rsa github.com >> $KNOWN_HOSTS_FILE
+    fi
+    
+    # Create or update SSH config
+    if [ ! -f "$CONFIG_FILE" ]; then
+        echo "Host github.com" > $CONFIG_FILE
+        echo "  IdentityFile $SSH_KEY_FILE" >> $CONFIG_FILE
+        echo "  User git" >> $CONFIG_FILE
+    else
+        if ! grep -q "Host github.com" $CONFIG_FILE; then
+            echo "" >> $CONFIG_FILE
+            echo "Host github.com" >> $CONFIG_FILE
+            echo "  IdentityFile $SSH_KEY_FILE" >> $CONFIG_FILE
+            echo "  User git" >> $CONFIG_FILE
+        fi
+    fi
+    
+    chmod 600 $CONFIG_FILE
+    
+    echo -e "${GREEN}[SUCCESS]${NC} SSH configuration completed."
+}
+
+# Clone the repository
+function clone_repository() {
+    echo -e "${BLUE}[INFO]${NC} Cloning repository..."
+    
+    if [ -d "$INSTALL_DIR" ]; then
+        echo -e "${YELLOW}[WARNING]${NC} Installation directory already exists."
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Do you want to:"
+        echo "1) Remove existing installation and reinstall"
+        echo "2) Update existing installation"
+        echo "3) Exit"
+        read -p "Select option [1-3]: " clone_option
+        
+        case $clone_option in
+            1)
+                echo -e "${BLUE}[INFO]${NC} Removing existing installation..."
+                rm -rf $INSTALL_DIR
+                echo -e "${BLUE}[INFO]${NC} Cloning repository to $INSTALL_DIR..."
+                GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git clone $REPO_URL $INSTALL_DIR
+                ;;
+            2)
+                echo -e "${BLUE}[INFO]${NC} Updating existing installation..."
+                cd $INSTALL_DIR
+                GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git pull
+                ;;
+            3)
+                echo -e "${YELLOW}[INFO]${NC} Exiting..."
+                exit 0
+                ;;
+            *)
+                echo -e "${RED}[ERROR]${NC} Invalid option. Exiting..."
+                exit 1
+                ;;
+        esac
+    else
+        echo -e "${BLUE}[INFO]${NC} Cloning repository to $INSTALL_DIR..."
+        GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git clone $REPO_URL $INSTALL_DIR
+    fi
+    
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[SUCCESS]${NC} Repository cloned/updated successfully."
+    else
+        echo -e "${RED}[ERROR]${NC} Failed to clone/update repository. Please check your SSH key and repository access."
+        exit 1
+    fi
+}
+
+# List available releases
+function list_releases() {
+    cd $INSTALL_DIR
+    echo -e "${BLUE}[INFO]${NC} Fetching available releases..."
+    GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git fetch --tags
+    
+    echo -e "${BLUE}[INFO]${NC} Available releases:"
+    git tag -l | sort -V
+    
+    echo ""
+    echo -e "${BLUE}[INFO]${NC} Current version:"
+    git describe --tags --abbrev=0
+}
+
+# Switch to a specific release
+function switch_release() {
+    cd $INSTALL_DIR
+    
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter the release version to install (e.g., v1.0.0):"
+    read release_version
+    
+    echo -e "${BLUE}[INFO]${NC} Switching to release $release_version..."
+    GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git fetch --tags
+    
+    # Check if the release exists
+    if git rev-parse "$release_version" >/dev/null 2>&1; then
+        git checkout $release_version
+        echo -e "${GREEN}[SUCCESS]${NC} Switched to release $release_version."
+    else
+        echo -e "${RED}[ERROR]${NC} Release $release_version not found."
+        list_releases
+        exit 1
+    fi
+}
+
+# Install dependencies
+function install_dependencies() {
+    echo -e "${BLUE}[INFO]${NC} Installing required packages..."
+    
+    apt update
+    
+    # PHP and Apache
+    apt install -y php php-fpm php-mysql lamp-server^ libapache2-mod-php mysql-server apache2 php-mbstring php-zip php-gd php-json php-curl
+    
+    # Enable and start services
+    systemctl enable mysql.service
+    systemctl start mysql.service
+    systemctl enable apache2
+    systemctl start apache2
+    
+    echo -e "${GREEN}[SUCCESS]${NC} Required packages installed."
+}
+
+# Configure the application
+function configure_application() {
+    echo -e "${BLUE}[INFO]${NC} Configuring application..."
+    
+    # Setup database
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter database name:"
+    read db_name
+    
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter database username:"
+    read db_user
+    
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter database password:"
+    read -s db_pass
+    echo ""
+    
+    # Create database and user
+    mysql -e "CREATE DATABASE IF NOT EXISTS ${db_name};"
+    mysql -e "CREATE USER IF NOT EXISTS '${db_user}'@'localhost' IDENTIFIED BY '${db_pass}';"
+    mysql -e "GRANT ALL PRIVILEGES ON ${db_name}.* TO '${db_user}'@'localhost';"
+    mysql -e "FLUSH PRIVILEGES;"
+    
+    # Update config file
+    if [ -f "$INSTALL_DIR/config.php" ]; then
+        sed -i "s/\$dbname = \"databasename\"/\$dbname = \"$db_name\"/" $INSTALL_DIR/config.php
+        sed -i "s/\$usernamedb = \"username\"/\$usernamedb = \"$db_user\"/" $INSTALL_DIR/config.php
+        sed -i "s/\$passworddb = \"password\"/\$passworddb = \"$db_pass\"/" $INSTALL_DIR/config.php
+        
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter bot token:"
+        read bot_token
+        sed -i "s/\$APIKEY = \"\*\*TOKEN\*\*\"/\$APIKEY = \"$bot_token\"/" $INSTALL_DIR/config.php
+        
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter admin user ID:"
+        read admin_id
+        sed -i "s/\$adminnumber = \"5522424631\"/\$adminnumber = \"$admin_id\"/" $INSTALL_DIR/config.php
+        
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter domain (e.g., example.com/bot):"
+        read domain_host
+        sed -i "s/\$domainhosts = \"domain.com\/bot\"/\$domainhosts = \"$domain_host\"/" $INSTALL_DIR/config.php
+        
+        echo -e "${YELLOW}[INPUT NEEDED]${NC} Enter bot username (without @):"
+        read bot_username
+        sed -i "s/\$usernamebot = \"marzbaninfobot\"/\$usernamebot = \"$bot_username\"/" $INSTALL_DIR/config.php
+    else
+        echo -e "${RED}[ERROR]${NC} Config file not found. Installation may be incomplete."
+        exit 1
+    fi
+    
+    # Set permissions
+    chown -R www-data:www-data $INSTALL_DIR
+    chmod -R 755 $INSTALL_DIR
+    
+    echo -e "${GREEN}[SUCCESS]${NC} Application configured successfully."
+}
+
+# Configure cron jobs
+function setup_cron() {
+    echo -e "${BLUE}[INFO]${NC} Setting up cron jobs..."
+    
+    crontab -l > mycron || true
+    
+    # Check if the cron job already exists
+    if ! grep -q "$INSTALL_DIR/cron/cronday.php" mycron; then
+        echo "0 0 * * * php $INSTALL_DIR/cron/cronday.php" >> mycron
+    fi
+    
+    if ! grep -q "$INSTALL_DIR/cron/cronvolume.php" mycron; then
+        echo "*/10 * * * * php $INSTALL_DIR/cron/cronvolume.php" >> mycron
+    fi
+    
+    if ! grep -q "$INSTALL_DIR/cron/removeexpire.php" mycron; then
+        echo "*/10 * * * * php $INSTALL_DIR/cron/removeexpire.php" >> mycron
+    fi
+    
+    if ! grep -q "$INSTALL_DIR/cron/sendmessage.php" mycron; then
+        echo "*/10 * * * * php $INSTALL_DIR/cron/sendmessage.php" >> mycron
+    fi
+    
+    crontab mycron
+    rm mycron
+    
+    echo -e "${GREEN}[SUCCESS]${NC} Cron jobs set up."
+}
+
+# Set up auto-updates (optional)
+function setup_auto_updates() {
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Do you want to set up automatic updates? (y/n)"
+    read auto_update_choice
+    
+    if [[ $auto_update_choice == "y" || $auto_update_choice == "Y" ]]; then
+        crontab -l > mycron || true
+        
+        # Check if the update cron job already exists
+        if ! grep -q "$INSTALL_DIR/install.sh" mycron; then
+            echo "0 3 * * 0 cd $INSTALL_DIR && bash install.sh -update" >> mycron
+        fi
+        
+        crontab mycron
+        rm mycron
+        
+        echo -e "${GREEN}[SUCCESS]${NC} Auto-updates scheduled for every Sunday at 3 AM."
+    else
+        echo -e "${BLUE}[INFO]${NC} Skipping auto-updates setup."
+    fi
+}
+
+# Update function
+function update_bestify() {
+    cd $INSTALL_DIR
+    
+    echo -e "${BLUE}[INFO]${NC} Backing up configuration..."
+    cp config.php config.php.bak
+    
+    echo -e "${BLUE}[INFO]${NC} Checking for updates..."
+    GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git fetch --tags
+    
+    # Get current version
+    current_version=$(git describe --tags --abbrev=0)
+    echo -e "${BLUE}[INFO]${NC} Current version: $current_version"
+    
+    # Get latest version
+    latest_version=$(GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git tag -l | sort -V | tail -n 1)
+    echo -e "${BLUE}[INFO]${NC} Latest version: $latest_version"
+    
+    if [ "$current_version" != "$latest_version" ]; then
+        echo -e "${BLUE}[INFO]${NC} Updating to version $latest_version..."
+        GIT_SSH_COMMAND="ssh -i $SSH_KEY_FILE" git checkout $latest_version
+        
+        echo -e "${BLUE}[INFO]${NC} Restoring configuration..."
+        cp config.php.bak config.php
+        
+        echo -e "${GREEN}[SUCCESS]${NC} Updated to version $latest_version."
+    else
+        echo -e "${GREEN}[SUCCESS]${NC} Already at the latest version."
+    fi
+}
+
+# Remove function
+function remove_bestify() {
+    echo -e "${YELLOW}[WARNING]${NC} This will completely remove Bestify Mode from your server."
+    echo -e "${YELLOW}[INPUT NEEDED]${NC} Are you sure you want to proceed? (y/n)"
+    read remove_choice
+    
+    if [[ $remove_choice == "y" || $remove_choice == "Y" ]]; then
+        echo -e "${BLUE}[INFO]${NC} Removing Bestify Mode..."
+        
+        # Delete the installation directory
+        rm -rf $INSTALL_DIR
+        
+        # Remove cron jobs
+        crontab -l | grep -v "$INSTALL_DIR" > mycron
+        crontab mycron
+        rm mycron
+        
+        echo -e "${GREEN}[SUCCESS]${NC} Bestify Mode has been removed."
+    else
+        echo -e "${BLUE}[INFO]${NC} Removal cancelled."
+    fi
+}
+
+# Main menu
 function show_menu() {
     show_logo
-    echo -e "\033[1;36m1)\033[0m Install Mirza Bot"
-    echo -e "\033[1;36m2)\033[0m Update Mirza Bot"
-    echo -e "\033[1;36m3)\033[0m Remove Mirza Bot"
-    echo -e "\033[1;36m4)\033[0m Export Database"
-    echo -e "\033[1;36m5)\033[0m Import Database"
-    echo -e "\033[1;36m6)\033[0m Configure Automated Backup"
-    echo -e "\033[1;36m7)\033[0m Renew SSL Certificates"
-    echo -e "\033[1;36m8)\033[0m Change Domain"
-    echo -e "\033[1;36m9)\033[0m Additional Bot Management"
-    echo -e "\033[1;36m10)\033[0m Exit"
+    echo -e "${BLUE}1)${NC} Install Bestify Mode"
+    echo -e "${BLUE}2)${NC} Update Bestify Mode"
+    echo -e "${BLUE}3)${NC} Switch to specific release"
+    echo -e "${BLUE}4)${NC} View available releases"
+    echo -e "${BLUE}5)${NC} Remove Bestify Mode"
+    echo -e "${BLUE}6)${NC} Exit"
     echo ""
-    read -p "Select an option [1-10]: " option
+    read -p "Select an option [1-6]: " option
+    
     case $option in
-        1) install_bot ;;
-        2) update_bot ;;
-        3) remove_bot ;;
-        4) export_database ;;
-        5) import_database ;;
-        6) auto_backup ;;
-        7) renew_ssl ;;
-        8) change_domain ;;
-        9) manage_additional_bots ;;
-        10)
-            echo -e "\033[32mExiting...\033[0m"
+        1)
+            check_dependencies
+            setup_ssh_key
+            clone_repository
+            install_dependencies
+            configure_application
+            setup_cron
+            setup_auto_updates
+            echo -e "${GREEN}[SUCCESS]${NC} Bestify Mode installed successfully!"
+            ;;
+        2)
+            check_dependencies
+            setup_ssh_key
+            update_bestify
+            ;;
+        3)
+            check_dependencies
+            setup_ssh_key
+            list_releases
+            switch_release
+            ;;
+        4)
+            check_dependencies
+            setup_ssh_key
+            list_releases
+            ;;
+        5)
+            remove_bestify
+            ;;
+        6)
+            echo -e "${GREEN}Exiting...${NC}"
             exit 0
             ;;
         *)
-            echo -e "\033[31mInvalid option. Please try again.\033[0m"
+            echo -e "${RED}[ERROR]${NC} Invalid option. Please try again."
             show_menu
             ;;
     esac
 }
 
-# Check if Marzban is installed
-function check_marzban_installed() {
-    if [ -f "/opt/marzban/docker-compose.yml" ]; then
-        return 0  # Marzban installed
-    else
-        return 1  # Marzban not installed
-    fi
-}
-
-# Detect database type for Marzban
-function detect_database_type() {
-    COMPOSE_FILE="/opt/marzban/docker-compose.yml"
-    if grep -q "mysql:" "$COMPOSE_FILE"; then
-        return 0  # MySQL detected
-    else
-        echo -e "\033[31m[ERROR] Marzban is installed but MySQL database is not present. Installation cannot proceed.\033[0m"
-        exit 1
-    fi
-}
-
-# Find a free port between 3300 and 3330
-function find_free_port() {
-    for port in {3300..3330}; do
-        if ! ss -tuln | grep -q ":$port "; then
-            echo "$port"
-            return 0
-        fi
-    done
-    echo -e "\033[31m[ERROR] No free port found between 3300 and 3330.\033[0m"
-    exit 1
-}
-# Install Function
-function install_bot() {
-    echo -e "\e[32mInstalling mirza script ... \033[0m\n"
-
-    # Check if Marzban is installed and redirect to appropriate function
-    if check_marzban_installed; then
-        echo -e "\033[41m[IMPORTANT WARNING]\033[0m \033[1;33mMarzban detected. Proceeding with Marzban-compatible installation.\033[0m"
-        install_bot_with_marzban "$@"  # Pass any arguments (e.g., -v beta)
-        return 0
-    fi
-
-    # Function to add the Ondřej Surý PPA for PHP
-    add_php_ppa() {
-        sudo add-apt-repository -y ppa:ondrej/php || {
-            echo -e "\e[91mError: Failed to add PPA ondrej/php.\033[0m"
-            return 1
-        }
-    }
-
-    # Function to add the Ondřej Surý PPA for PHP with locale override
-    add_php_ppa_with_locale() {
-        sudo LC_ALL=C.UTF-8 add-apt-repository -y ppa:ondrej/php || {
-            echo -e "\e[91mError: Failed to add PPA ondrej/php with locale override.\033[0m"
-            return 1
-        }
-    }
-
-    # Try adding the PPA with the system's default locale settings
-    if ! add_php_ppa; then
-        echo "Failed to add PPA with default locale, retrying with locale override..."
-        if ! add_php_ppa_with_locale; then
-            echo "Failed to add PPA even with locale override. Exiting..."
-            exit 1
-        fi
-    fi
-
-    sudo apt update && sudo apt upgrade -y || {
-        echo -e "\e[91mError: Failed to update and upgrade packages.\033[0m"
-        exit 1
-    }
-    echo -e "\e[92mThe server was successfully updated ...\033[0m\n"
-
-    sudo apt install -y git unzip curl || {
-        echo -e "\e[91mError: Failed to install required packages.\033[0m"
-        exit 1
-    }
-
-    DEBIAN_FRONTEND=noninteractive sudo apt install -y php8.2 php8.2-fpm php8.2-mysql || {
-        echo -e "\e[91mError: Failed to install PHP 8.2 and related packages.\033[0m"
-        exit 1
-    }
-
-    # List of required packages
-    PKG=(
-        lamp-server^
-        libapache2-mod-php
-        mysql-server
-        apache2
-        php-mbstring
-        php-zip
-        php-gd
-        php-json
-        php-curl
-    )
-
-    # Installing required packages with error handling
-    for i in "${PKG[@]}"; do
-        dpkg -s $i &>/dev/null
-        if [ $? -eq 0 ]; then
-            echo "$i is already installed"
-        else
-            if ! DEBIAN_FRONTEND=noninteractive sudo apt install -y $i; then
-                echo -e "\e[91mError installing $i. Exiting...\033[0m"
-                exit 1
-            fi
-        fi
-    done
-
-    echo -e "\n\e[92mPackages Installed, Continuing ...\033[0m\n"
-
-    # phpMyAdmin Configuration
-    echo 'phpmyadmin phpmyadmin/dbconfig-install boolean true' | sudo debconf-set-selections
-    echo 'phpmyadmin phpmyadmin/app-password-confirm password mirzahipass' | sudo debconf-set-selections
-    echo 'phpmyadmin phpmyadmin/mysql/admin-pass password mirzahipass' | sudo debconf-set-selections
-    echo 'phpmyadmin phpmyadmin/mysql/app-pass password mirzahipass' | sudo debconf-set-selections
-    echo 'phpmyadmin phpmyadmin/reconfigure-webserver multiselect apache2' | sudo debconf-set-selections
-
-    sudo apt-get install phpmyadmin -y || {
-        echo -e "\e[91mError: Failed to install phpMyAdmin.\033[0m"
-        exit 1
-    }
-    # Check and remove existing phpMyAdmin configuration
-    if [ -f /etc/apache2/conf-available/phpmyadmin.conf ]; then
-        sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf && echo -e "\e[92mRemoved existing phpMyAdmin configuration.\033[0m"
-    fi
-
-    # Create symbolic link for phpMyAdmin configuration
-    sudo ln -s /etc/phpmyadmin/apache.conf /etc/apache2/conf-available/phpmyadmin.conf || {
-        echo -e "\e[91mError: Failed to create symbolic link for phpMyAdmin configuration.\033[0m"
-        exit 1
-    }
-
-    sudo a2enconf phpmyadmin.conf || {
-        echo -e "\e[91mError: Failed to enable phpMyAdmin configuration.\033[0m"
-        exit 1
-    }
-    sudo systemctl restart apache2 || {
-        echo -e "\e[91mError: Failed to restart Apache2 service.\033[0m"
-        exit 1
-    }
+# Process command line arguments
+if [[ "$1" == "-update" ]]; then
+    check_dependencies
+    setup_ssh_key
+    update_bestify
+    exit 0
+elif [[ "$1" == "-version" ]]; then
+    check_dependencies
+    setup_ssh_key
+    list_releases
+    exit 0
+else
+    show_menu
+fi
 
     # Additional package installations with error handling
     sudo apt-get install -y php-soap || {
@@ -393,185 +649,6 @@ while [[ ! "$domainname" =~ ^[a-zA-Z0-9.-]+$ ]]; do
     echo -e "\e[91mInvalid domain format. Please try again.\033[0m"
     read -p "Enter the domain: " domainname
 done
-    DOMAIN_NAME="$domainname"
-    PATHS=$(cat /root/confmirza/dbrootmirza.txt | grep '$path' | cut -d"'" -f2)
-    sudo ufw allow 80 || {
-        echo -e "\e[91mError: Failed to allow port 80 in UFW.\033[0m"
-        exit 1
-    }
-    sudo ufw allow 443 || {
-        echo -e "\e[91mError: Failed to allow port 443 in UFW.\033[0m"
-        exit 1
-    }
-
-    echo -e "\033[33mDisable apache2\033[0m"
-    wait
-
-    sudo systemctl stop apache2 || {
-        echo -e "\e[91mError: Failed to stop Apache2.\033[0m"
-        exit 1
-    }
-    sudo systemctl disable apache2 || {
-        echo -e "\e[91mError: Failed to disable Apache2.\033[0m"
-        exit 1
-    }
-    sudo apt install letsencrypt -y || {
-        echo -e "\e[91mError: Failed to install letsencrypt.\033[0m"
-        exit 1
-    }
-    sudo systemctl enable certbot.timer || {
-        echo -e "\e[91mError: Failed to enable certbot timer.\033[0m"
-        exit 1
-    }
-    sudo certbot certonly --standalone --agree-tos --preferred-challenges http -d $DOMAIN_NAME || {
-        echo -e "\e[91mError: Failed to generate SSL certificate.\033[0m"
-        exit 1
-    }
-    sudo apt install python3-certbot-apache -y || {
-        echo -e "\e[91mError: Failed to install python3-certbot-apache.\033[0m"
-        exit 1
-    }
-    sudo certbot --apache --agree-tos --preferred-challenges http -d $DOMAIN_NAME || {
-        echo -e "\e[91mError: Failed to configure SSL with Certbot.\033[0m"
-        exit 1
-    }
-
-    echo " "
-    echo -e "\033[33mEnable apache2\033[0m"
-    wait
-    sudo systemctl enable apache2 || {
-        echo -e "\e[91mError: Failed to enable Apache2.\033[0m"
-        exit 1
-    }
-    sudo systemctl start apache2 || {
-        echo -e "\e[91mError: Failed to start Apache2.\033[0m"
-        exit 1
-    }
-            clear
-
-        printf "\e[33m[+] \e[36mBot Token: \033[0m"
-        read YOUR_BOT_TOKEN
-        while [[ ! "$YOUR_BOT_TOKEN" =~ ^[0-9]{8,10}:[a-zA-Z0-9_-]{35}$ ]]; do
-            echo -e "\e[91mInvalid bot token format. Please try again.\033[0m"
-            printf "\e[33m[+] \e[36mBot Token: \033[0m"
-            read YOUR_BOT_TOKEN
-        done
-
-        printf "\e[33m[+] \e[36mChat id: \033[0m"
-        read YOUR_CHAT_ID
-        while [[ ! "$YOUR_CHAT_ID" =~ ^-?[0-9]+$ ]]; do
-            echo -e "\e[91mInvalid chat ID format. Please try again.\033[0m"
-            printf "\e[33m[+] \e[36mChat id: \033[0m"
-            read YOUR_CHAT_ID
-        done
-
-        YOUR_DOMAIN="$DOMAIN_NAME"
-
-    while true; do
-        printf "\e[33m[+] \e[36musernamebot: \033[0m"
-        read YOUR_BOTNAME
-        if [ "$YOUR_BOTNAME" != "" ]; then
-            break
-        else
-            echo -e "\e[91mError: Bot username cannot be empty. Please enter a valid username.\033[0m"
-        fi
-    done
-
-    ROOT_PASSWORD=$(cat /root/confmirza/dbrootmirza.txt | grep '$pass' | cut -d"'" -f2)
-    ROOT_USER="root"
-    echo "SELECT 1" | mysql -u$ROOT_USER -p$ROOT_PASSWORD 2>/dev/null || {
-        echo -e "\e[91mError: MySQL connection failed.\033[0m"
-        exit 1
-    }
-
-    if [ $? -eq 0 ]; then
-        wait
-
-        randomdbpass=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-
-        randomdbdb=$(openssl rand -base64 10 | tr -dc 'a-zA-Z' | cut -c1-8)
-
-        if [[ $(mysql -u root -p$ROOT_PASSWORD -e "SHOW DATABASES LIKE 'mirzabot'") ]]; then
-            clear
-            echo -e "\n\e[91mYou have already created the database\033[0m\n"
-        else
-            dbname=mirzabot
-            clear
-            echo -e "\n\e[32mPlease enter the database username!\033[0m"
-            printf "[+] Default user name is \e[91m${randomdbdb}\e[0m ( let it blank to use this user name ): "
-            read dbuser
-            if [ "$dbuser" = "" ]; then
-                dbuser=$randomdbdb
-            fi
-
-            echo -e "\n\e[32mPlease enter the database password!\033[0m"
-            printf "[+] Default password is \e[91m${randomdbpass}\e[0m ( let it blank to use this password ): "
-            read dbpass
-            if [ "$dbpass" = "" ]; then
-                dbpass=$randomdbpass
-            fi
-
-            mysql -u root -p$ROOT_PASSWORD -e "CREATE DATABASE $dbname;" -e "CREATE USER '$dbuser'@'%' IDENTIFIED WITH mysql_native_password BY '$dbpass';GRANT ALL PRIVILEGES ON * . * TO '$dbuser'@'%';FLUSH PRIVILEGES;" -e "CREATE USER '$dbuser'@'localhost' IDENTIFIED WITH mysql_native_password BY '$dbpass';GRANT ALL PRIVILEGES ON * . * TO '$dbuser'@'localhost';FLUSH PRIVILEGES;" || {
-                echo -e "\e[91mError: Failed to create database or user.\033[0m"
-                exit 1
-            }
-
-            echo -e "\n\e[95mDatabase Created.\033[0m"
-
-            clear
-
-
-
-            ASAS="$"
-
-            wait
-
-            sleep 1
-
-            file_path="/var/www/html/mirzabotconfig/config.php"
-
-            if [ -f "$file_path" ]; then
-              rm "$file_path" || {
-                echo -e "\e[91mError: Failed to delete old config.php.\033[0m"
-                exit 1
-              }
-              echo -e "File deleted successfully."
-            else
-              echo -e "File not found."
-            fi
-
-            sleep 1
-
-            secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-
-            echo -e "<?php" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}APIKEY = '${YOUR_BOT_TOKEN}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}usernamedb = '${dbuser}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}passworddb = '${dbpass}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}dbname = '${dbname}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}domainhosts = '${YOUR_DOMAIN}/mirzabotconfig';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}adminnumber = '${YOUR_CHAT_ID}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}usernamebot = '${YOUR_BOTNAME}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}secrettoken = '${secrettoken}';" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "${ASAS}connect = mysqli_connect('localhost', \$usernamedb, \$passworddb, \$dbname);" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "if (${ASAS}connect->connect_error) {" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "die(' The connection to the database failed:' . ${ASAS}connect->connect_error);" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "}" >> /var/www/html/mirzabotconfig/config.php
-            echo -e "mysqli_set_charset(${ASAS}connect, 'utf8mb4');" >> /var/www/html/mirzabotconfig/config.php
-            text_to_save=$(cat <<EOF
-\$options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
-\$dsn = "mysql:host=localhost;dbname=${ASAS}dbname;charset=utf8mb4";
-try {
-     \$pdo = new PDO(\$dsn, \$usernamedb, \$passworddb, \$options);
-} catch (\PDOException \$e) {
-     throw new \PDOException(\$e->getMessage(), (int)\$e->getCode());
-}
-EOF
-)
 echo -e "$text_to_save" >> /var/www/html/mirzabotconfig/config.php
             echo -e "?>" >> /var/www/html/mirzabotconfig/config.php
 
@@ -939,200 +1016,10 @@ Listen 88
 
 # vim: syntax=apache ts=4 sw=4 sts=4 sr noet
 EOF
-    if [ $? -ne 0 ]; then
-        echo -e "\e[91mError: Failed to reconfigure ports.conf.\033[0m"
-        exit 1
-    fi
-
-    # Remove port 80 VirtualHost from all config files
-    sudo sed -i '/<VirtualHost \*:80>/,/<\/VirtualHost>/d' /etc/apache2/sites-available/* || {
-        echo -e "\e[91mError: Failed to remove VirtualHost for port 80 from all config files.\033[0m"
-        exit 1
-    }
-    sudo ufw delete allow 80 || {
-        echo -e "\e[91mError: Failed to remove port 80 from firewall.\033[0m"
-        exit 1
-    }
-    sudo systemctl restart apache2 || {
-        echo -e "\e[91mError: Failed to restart Apache2 after SSL.\033[0m"
-        exit 1
-    }
-    echo -e "\e[92mSSL configured successfully on port 88. Port 80 disabled.\033[0m"
-    sleep 3
-    clear
-
-    # Bot token, chat ID, and username
-    printf "\e[33m[+] \e[36mBot Token: \033[0m"
-    read YOUR_BOT_TOKEN
-    while [[ ! "$YOUR_BOT_TOKEN" =~ ^[0-9]{8,10}:[a-zA-Z0-9_-]{35}$ ]]; do
-        echo -e "\e[91mInvalid bot token format. Please try again.\033[0m"
-        printf "\e[33m[+] \e[36mBot Token: \033[0m"
-        read YOUR_BOT_TOKEN
-    done
-
-    printf "\e[33m[+] \e[36mChat id: \033[0m"
-    read YOUR_CHAT_ID
-    while [[ ! "$YOUR_CHAT_ID" =~ ^-?[0-9]+$ ]]; do
-        echo -e "\e[91mInvalid chat ID format. Please try again.\033[0m"
-        printf "\e[33m[+] \e[36mChat id: \033[0m"
-        read YOUR_CHAT_ID
-    done
-
-    YOUR_DOMAIN="$DOMAIN_NAME:88"  # Use port 88 for HTTPS
-    printf "\e[33m[+] \e[36mUsernamebot: \033[0m"
-    read YOUR_BOTNAME
-    while [ -z "$YOUR_BOTNAME" ]; do
-        echo -e "\e[91mError: Bot username cannot be empty.\033[0m"
-        printf "\e[33m[+] \e[36mUsernamebot: \033[0m"
-        read YOUR_BOTNAME
-    done
-
-    # Create config file with correct MySQL host and PDO
-    ASAS="$"
-    secrettoken=$(openssl rand -base64 10 | tr -dc 'a-zA-Z0-9' | cut -c1-8)
-    cat <<EOF > "$BOT_DIR/config.php"
-<?php
-${ASAS}APIKEY = '$YOUR_BOT_TOKEN';
-${ASAS}usernamedb = '$dbuser';
-${ASAS}passworddb = '$dbpass';
-${ASAS}dbname = '$dbname';
-${ASAS}domainhosts = '$YOUR_DOMAIN/mirzabotconfig';
-${ASAS}adminnumber = '$YOUR_CHAT_ID';
-${ASAS}usernamebot = '$YOUR_BOTNAME';
-${ASAS}secrettoken = '$secrettoken';
-
-${ASAS}connect = mysqli_connect('127.0.0.1', \$usernamedb, \$passworddb, \$dbname, 3306);
-if (${ASAS}connect->connect_error) {
-    die('Connection failed: ' . ${ASAS}connect->connect_error);
-}
-mysqli_set_charset(${ASAS}connect, 'utf8mb4');
-
-${ASAS}options = [
-    PDO::ATTR_ERRMODE            => PDO::ERRMODE_EXCEPTION,
-    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-    PDO::ATTR_EMULATE_PREPARES   => false,
-];
-${ASAS}dsn = "mysql:host=127.0.0.1;port=3306;dbname=\$dbname;charset=utf8mb4";
-try {
-    ${ASAS}pdo = new PDO(\$dsn, \$usernamedb, \$passworddb, \$options);
-} catch (\PDOException \$e) {
-    die('PDO Connection failed: ' . \$e->getMessage());
-}
-?>
-EOF
-
-    # Set webhook with port 88
-    curl -F "url=https://${YOUR_DOMAIN}/mirzabotconfig/index.php" \
-         -F "secret_token=${secrettoken}" \
-         "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/setWebhook" || {
-        echo -e "\e[91mError: Failed to set webhook.\033[0m"
-        exit 1
-    }
-
-    # Send confirmation message
-    MESSAGE="✅ The bot is installed alongside Marzban! Send /start to begin."
-    curl -s -X POST "https://api.telegram.org/bot${YOUR_BOT_TOKEN}/sendMessage" \
-         -d chat_id="${YOUR_CHAT_ID}" -d text="$MESSAGE" || {
-        echo -e "\e[91mError: Failed to send Telegram message.\033[0m"
-        exit 1
-    }
-
-    # Setup database tables with retry mechanism
-    for i in {1..5}; do
-        curl "https://${YOUR_DOMAIN}/mirzabotconfig/table.php" && break || {
-            echo -e "\e[93mAttempt $i: Failed to set up database tables. Retrying in 2 seconds...\033[0m"
-            sleep 2
-        }
-        if [ $i -eq 5 ]; then
-            echo -e "\e[91mError: Failed to set up database tables after 5 attempts.\033[0m"
-            exit 1
-        fi
-    done
-
-    # Final output
-    clear
-    echo -e "\e[32mBot installed successfully alongside Marzban!\033[0m"
-    echo -e "\e[102mDomain Bot: https://${YOUR_DOMAIN}\033[0m"
-    echo -e "\e[33mDatabase name: \e[36m$dbname\033[0m"
-    echo -e "\e[33mDatabase username: \e[36m$dbuser\033[0m"
-    echo -e "\e[33mDatabase password: \e[36m$dbpass\033[0m"
-}
-
-
-# Update Function
-function update_bot() {
-    echo "Updating Mirza Bot..."
-
-    # Update server packages
-    if ! sudo apt update && sudo apt upgrade -y; then
-        echo -e "\e[91mError updating the server. Exiting...\033[0m"
-        exit 1
-    fi
-    echo -e "\e[92mServer packages updated successfully...\033[0m\n"
-
-    # Check if bot is already installed
-    BOT_DIR="/var/www/html/mirzabotconfig"
-    if [ ! -d "$BOT_DIR" ]; then
-        echo -e "\e[91mError: Mirza Bot is not installed. Please install it first.\033[0m"
-        exit 1
-    fi
-
-    # Fetch latest release from GitHub
-    # Check for version flag
-    if [[ "$1" == "-beta" ]] || [[ "$1" == "-v" && "$2" == "beta" ]]; then
-        ZIP_URL="https://github.com/mahdiMGF2/botmirzapanel/archive/refs/heads/main.zip"
-    else
-        ZIP_URL=$(curl -s https://api.github.com/repos/mahdiMGF2/botmirzapanel/releases/latest | grep "zipball_url" | cut -d '"' -f4)
-    fi
-    
-    # Create temporary directory
-    TEMP_DIR="/tmp/mirzabot_update"
-    mkdir -p "$TEMP_DIR"
-    
-    # Download and extract
-    wget -O "$TEMP_DIR/bot.zip" "$ZIP_URL" || {
-        echo -e "\e[91mError: Failed to download update package.\033[0m"
-        exit 1
-    }
-    unzip "$TEMP_DIR/bot.zip" -d "$TEMP_DIR"
-    
-    # Find extracted directory
-    EXTRACTED_DIR=$(find "$TEMP_DIR" -mindepth 1 -maxdepth 1 -type d)
-    
-    # Backup config file
-    CONFIG_PATH="/var/www/html/mirzabotconfig/config.php"
-    TEMP_CONFIG="/root/mirza_config_backup.php"
-    if [ -f "$CONFIG_PATH" ]; then
-        cp "$CONFIG_PATH" "$TEMP_CONFIG" || {
-            echo -e "\e[91mConfig file backup failed!\033[0m"
-            exit 1
-        }
-    fi
-    
-    # Remove old version
-    sudo rm -rf /var/www/html/mirzabotconfig || {
-        echo -e "\e[91mFailed to remove old bot files!\033[0m"
-        exit 1
-    }
-    
-    # Move new files
-    sudo mkdir -p /var/www/html/mirzabotconfig
-    sudo mv "$EXTRACTED_DIR"/* /var/www/html/mirzabotconfig/ || {
-        echo -e "\e[91mFile transfer failed!\033[0m"
-        exit 1
-    }
-    
-    # Restore config file
-    if [ -f "$TEMP_CONFIG" ]; then
-        sudo mv "$TEMP_CONFIG" "$CONFIG_PATH" || {
-            echo -e "\e[91mConfig file restore failed!\033[0m"
-            exit 1
-        }
-    fi
     
     # Set permissions
-    sudo chown -R www-data:www-data /var/www/html/mirzabotconfig/
-    sudo chmod -R 755 /var/www/html/mirzabotconfig/
+    chown -R www-data:www-data $INSTALL_DIR
+    chmod -R 755 $INSTALL_DIR
     
     # Run setup script
     URL=$(grep '\$domainhosts' "$CONFIG_PATH" | cut -d"'" -f2)
@@ -1145,187 +1032,6 @@ function update_bot() {
     
     echo -e "\n\e[92mMirza Bot updated to latest version successfully!\033[0m"
 }
-
-# Delete Function
-function remove_bot() {
-    echo -e "\e[33mStarting Mirza Bot removal process...\033[0m"
-    LOG_FILE="/var/log/remove_bot.log"
-    echo "Log file: $LOG_FILE" > "$LOG_FILE"
-
-    # Check if Mirza Bot is installed
-    BOT_DIR="/var/www/html/mirzabotconfig"
-    if [ ! -d "$BOT_DIR" ]; then
-        echo -e "\e[31m[ERROR]\033[0m Mirza Bot is not installed (/var/www/html/mirzabotconfig not found)." | tee -a "$LOG_FILE"
-        echo -e "\e[33mNothing to remove. Exiting...\033[0m" | tee -a "$LOG_FILE"
-        sleep 2
-        exit 1
-    fi
-
-    # User Confirmation
-    read -p "Are you sure you want to remove Mirza Bot and its dependencies? (y/n): " choice
-    if [[ "$choice" != "y" ]]; then
-        echo "Aborting..." | tee -a "$LOG_FILE"
-        exit 0
-    fi
-
-    # Check if Marzban is installed and redirect to appropriate function
-    if check_marzban_installed; then
-        echo -e "\e[41m[IMPORTANT NOTICE]\033[0m \e[33mMarzban detected. Proceeding with Marzban-compatible removal.\033[0m" | tee -a "$LOG_FILE"
-        remove_bot_with_marzban
-        return 0
-    fi
-
-    # Proceed with normal removal if Marzban is not installed
-    echo "Removing Mirza Bot..." | tee -a "$LOG_FILE"
-
-    # Delete the Bot Directory
-    if [ -d "$BOT_DIR" ]; then
-        sudo rm -rf "$BOT_DIR" && echo -e "\e[92mBot directory removed: $BOT_DIR\033[0m" | tee -a "$LOG_FILE" || {
-            echo -e "\e[91mFailed to remove bot directory: $BOT_DIR. Exiting...\033[0m" | tee -a "$LOG_FILE"
-            exit 1
-        }
-    fi
-
-    # Delete Configuration File
-    CONFIG_PATH="/root/config.php"
-    if [ -f "$CONFIG_PATH" ]; then
-        sudo shred -u -n 5 "$CONFIG_PATH" && echo -e "\e[92mConfig file securely removed: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE" || {
-            echo -e "\e[91mFailed to securely remove config file: $CONFIG_PATH\033[0m" | tee -a "$LOG_FILE"
-        }
-    fi
-
-    # Delete MySQL and Database Data
-    echo -e "\e[33mRemoving MySQL and database...\033[0m" | tee -a "$LOG_FILE"
-    sudo systemctl stop mysql
-    sudo systemctl disable mysql
-    sudo systemctl daemon-reload
-
-    sudo apt --fix-broken install -y
-
-    sudo apt-get purge -y mysql-server mysql-client mysql-common mysql-server-core-* mysql-client-core-*
-    sudo rm -rf /etc/mysql /var/lib/mysql /var/log/mysql /var/log/mysql.* /usr/lib/mysql /usr/include/mysql /usr/share/mysql
-    sudo rm /lib/systemd/system/mysql.service
-    sudo rm /etc/init.d/mysql
-
-    sudo dpkg --remove --force-remove-reinstreq mysql-server mysql-server-8.0
-
-    sudo find /etc/systemd /lib/systemd /usr/lib/systemd -name "*mysql*" -exec rm -f {} \;
-
-    sudo apt-get purge -y mysql-server mysql-server-8.0 mysql-client mysql-client-8.0
-    sudo apt-get purge -y mysql-client-core-8.0 mysql-server-core-8.0 mysql-common php-mysql php8.2-mysql php8.3-mysql php-mariadb-mysql-kbs
-
-    sudo apt-get autoremove --purge -y
-    sudo apt-get clean
-    sudo apt-get update
-
-    echo -e "\e[92mMySQL has been completely removed.\033[0m" | tee -a "$LOG_FILE"
-
-    # Delete PHPMyAdmin
-    echo -e "\e[33mRemoving PHPMyAdmin...\033[0m" | tee -a "$LOG_FILE"
-    if dpkg -s phpmyadmin &>/dev/null; then
-        sudo apt-get purge -y phpmyadmin && echo -e "\e[92mPHPMyAdmin removed.\033[0m" | tee -a "$LOG_FILE"
-        sudo apt-get autoremove -y && sudo apt-get autoclean -y
-    else
-        echo -e "\e[93mPHPMyAdmin is not installed.\033[0m" | tee -a "$LOG_FILE"
-    fi
-
-    # Remove Apache
-    echo -e "\e[33mRemoving Apache...\033[0m" | tee -a "$LOG_FILE"
-    sudo systemctl stop apache2 || {
-        echo -e "\e[91mFailed to stop Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
-    }
-    sudo systemctl disable apache2 || {
-        echo -e "\e[91mFailed to disable Apache. Continuing anyway...\033[0m" | tee -a "$LOG_FILE"
-    }
-    sudo apt-get purge -y apache2 apache2-utils apache2-bin apache2-data libapache2-mod-php* || {
-        echo -e "\e[91mFailed to purge Apache packages.\033[0m" | tee -a "$LOG_FILE"
-    }
-    sudo apt-get autoremove --purge -y
-    sudo apt-get autoclean -y
-    sudo rm -rf /etc/apache2 /var/www/html
-
-    # Delete Apache and PHP Settings
-    echo -e "\e[33mRemoving Apache and PHP configurations...\033[0m" | tee -a "$LOG_FILE"
-    sudo a2disconf phpmyadmin.conf &>/dev/null
-    sudo rm -f /etc/apache2/conf-available/phpmyadmin.conf
-    sudo systemctl restart apache2
-
-    # Remove Unnecessary Packages
-    echo -e "\e[33mRemoving additional packages...\033[0m" | tee -a "$LOG_FILE"
-    sudo apt-get remove -y php-soap php-ssh2 libssh2-1-dev libssh2-1 \
-        && echo -e "\e[92mRemoved additional PHP packages.\033[0m" | tee -a "$LOG_FILE" || echo -e "\e[93mSome additional PHP packages may not be installed.\033[0m" | tee -a "$LOG_FILE"
-
-    # Reset Firewall (without changing SSL rules)
-    echo -e "\e[33mResetting firewall rules (except SSL)...\033[0m" | tee -a "$LOG_FILE"
-    sudo ufw delete allow 'Apache'
-    sudo ufw reload
-
-    echo -e "\e[92mMirza Bot, MySQL, and their dependencies have been completely removed.\033[0m" | tee -a "$LOG_FILE"
-}
-
-function remove_bot_with_marzban() {
-    echo -e "\e[33mRemoving Mirza Bot alongside Marzban...\033[0m" | tee -a "$LOG_FILE"
-
-    # Define Bot Directory
-    BOT_DIR="/var/www/html/mirzabotconfig"
-
-    # Check if Bot Directory exists before proceeding
-    if [ ! -d "$BOT_DIR" ]; then
-        echo -e "\e[93mWarning: Bot directory $BOT_DIR not found. Assuming it was already removed.\033[0m" | tee -a "$LOG_FILE"
-        DB_NAME="mirzabot"  # Fallback to default database name
-        DB_USER=""
-    else
-        # Get database credentials from config.php BEFORE removing the directory
-        CONFIG_PATH="$BOT_DIR/config.php"
-        if [ -f "$CONFIG_PATH" ]; then
-            DB_USER=$(grep '^\$usernamedb' "$CONFIG_PATH" | awk -F"'" '{print $2}')
-            DB_NAME=$(grep '^\$dbname' "$CONFIG_PATH" | awk -F"'" '{print $2}')
-            if [ -z "$DB_USER" ] || [ -z "$DB_NAME" ]; then
-                echo -e "\e[91mError: Could not extract database credentials from $CONFIG_PATH. Using defaults.\033[0m" | tee -a "$LOG_FILE"
-                DB_NAME="mirzabot"  # Fallback to default
-                DB_USER=""
-            else
-                echo -e "\e[92mFound database credentials: User=$DB_USER, Database=$DB_NAME\033[0m" | tee -a "$LOG_FILE"
-            fi
-        else
-            echo -e "\e[93mWarning: config.php not found at $CONFIG_PATH. Assuming default database name 'mirzabot'.\033[0m" | tee -a "$LOG_FILE"
-            DB_NAME="mirzabot"
-            DB_USER=""
-        fi
-
-        # Now remove the Bot Directory
-        sudo rm -rf "$BOT_DIR" && echo -e "\e[92mBot directory removed: $BOT_DIR\033[0m" | tee -a "$LOG_FILE" || {
-            echo -e "\e[91mFailed to remove bot directory: $BOT_DIR. Exiting...\033[0m" | tee -a "$LOG_FILE"
-            exit 1
-        }
-    fi
-
-    # Get MySQL root password from Marzban's .env
-    ENV_FILE="/opt/marzban/.env"
-    if [ -f "$ENV_FILE" ]; then
-        MYSQL_ROOT_PASSWORD=$(grep "MYSQL_ROOT_PASSWORD=" "$ENV_FILE" | cut -d'=' -f2 | tr -d '[:space:]' | sed 's/"//g')
-        ROOT_USER="root"
-    else
-        echo -e "\e[91mError: Marzban .env file not found. Cannot proceed without MySQL root password.\033[0m" | tee -a "$LOG_FILE"
-        exit 1
-    fi
-
-    # Find MySQL container
-    MYSQL_CONTAINER=$(docker ps -q --filter "name=mysql" --no-trunc)
-    if [ -z "$MYSQL_CONTAINER" ]; then
-        echo -e "\e[91mError: Could not find a running MySQL container. Ensure Marzban is running.\033[0m" | tee -a "$LOG_FILE"
-        exit 1
-    fi
-
-    # Remove database
-    if [ -n "$DB_NAME" ]; then
-        echo -e "\e[33mRemoving database $DB_NAME...\033[0m" | tee -a "$LOG_FILE"
-        docker exec "$MYSQL_CONTAINER" bash -c "mysql -u '$ROOT_USER' -p'$MYSQL_ROOT_PASSWORD' -e \"DROP DATABASE IF EXISTS $DB_NAME;\"" && {
-            echo -e "\e[92mDatabase $DB_NAME removed successfully.\033[0m" | tee -a "$LOG_FILE"
-        } || {
-            echo -e "\e[91mFailed to remove database $DB_NAME.\033[0m" | tee -a "$LOG_FILE"
-        }
-    fi
 
     # Remove user if DB_USER is available
     if [ -n "$DB_USER" ]; then

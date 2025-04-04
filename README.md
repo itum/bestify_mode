@@ -1,187 +1,140 @@
-# 🤖 Bot Mirza Panel
+# 🚀 Bestify Mode
 
-A Powerful Bot for Selling VPN Services with Auto Configuration Build.
+سیستم مدیریت پیشرفته فروش خدمات VPN با پشتیبانی از چندین پنل
 
 <p align="center">
-    <a href="https://t.me/mirzapanel" target="_blank">
-        <img src="https://img.shields.io/badge/Telegram-Group-blue?style=flat-square&logo=telegram" alt="Telegram Group"/>
-    </a>
-    <a href="https://github.com/mahdiMGF2/botmirzapanel" target="_blank">
-        <img src="https://img.shields.io/github/stars/mahdiMGF2/botmirzapanel?style=social" alt="GitHub Stars"/>
-    </a>
-    <a href="https://img.shields.io/github/forks/mahdiMGF2/botmirzapanel?style=flat-square" target="_blank">
-        <img src="https://img.shields.io/github/forks/mahdiMGF2/botmirzapanel?style=flat-square" alt="GitHub Forks"/>
-    </a>
-    <a href="https://github.com/mahdiMGF2/botmirzapanel/issues" target="_blank">
-        <img src="https://img.shields.io/github/issues/mahdiMGF2/botmirzapanel?style=flat-square" alt="GitHub Issues"/>
-    </a>
+    <img src="https://img.shields.io/badge/Version-1.0.0-blue?style=flat-square" alt="Version"/>
+    <img src="https://img.shields.io/badge/Status-Private-red?style=flat-square" alt="Status"/>
+    <img src="https://img.shields.io/badge/PHP-8.2+-green?style=flat-square" alt="PHP Version"/>
 </p>
 
 
 ---
 
-## 📚 Table of Contents
+## 📑 فهرست مطالب
 
-- [✨ Overview](#-overview)
-- [⚙️ Features](#️-features)
-- [🚀 Installation](#-installation)
-  - [Beta Installation](#️-beta-installation)
-  - [Updating the Bot](#-updating-bot)
-  - [Removing the Bot](#-removing)
-- [📱 Demo Bot](#-demo-bot)
-- [💵 Financial Support](#-financial-support)
-
----
-
-## ✨ Overview
-
-**Mirza Bot Panel** is a feature-rich Telegram bot designed for selling VPN services for platforms like **Marzban** and **3x-ui panels**. This bot simplifies the process of VPN subscription sales, enabling seamless automation, configuration building, and user management.
-
-Mirza Panel comes in two versions:  
-1. **Free Version** 🆓: Offers basic functionalities to get started with VPN sales.  
-2. **Subscription Version** 💎: Provides advanced features for businesses looking for more customization, detailed analytics, and enhanced management options.  
-
-Whether you’re offering trial accounts or managing large-scale VPN services, this bot covers everything you need to run a successful VPN business.
+- [✨ معرفی](#-معرفی)
+- [⚙️ امکانات](#️-امکانات)
+- [🚀 نصب و راه‌اندازی](#-نصب-و-راه‌اندازی)
+  - [پیش‌نیازها](#-پیش‌نیازها)
+  - [نصب برنامه](#-نصب-برنامه)
+  - [به‌روزرسانی](#-به‌روزرسانی)
+  - [حذف کامل](#-حذف-کامل)
+- [👨‍💻 دسترسی به ریپوزیتوری خصوصی](#-دسترسی-به-ریپوزیتوری-خصوصی)
+- [🔄 مدیریت نسخه‌ها](#-مدیریت-نسخه‌ها)
 
 ---
 
-## ⚙️ Features
+## ✨ معرفی
 
-### 🔹 **Free Version Features**
-
-- ✅ VPN Purchase with Auto Configuration Creation
-- ✅ View Purchased Services
-- ✅ Trial Accounts for Users
-- ✅ User Support Section
-- ✅ Verification via Phone Number
-- ✅ Payments via:
-  - Card-to-Card
-  - **NowPayments Gateway**
-  - **aqayepardakht Gateway**
-- ✅ Fully Automated Configuration Creation
-- ✅ Compatibility with All Protocols
-- ✅ Mandatory Channel Membership for Purchases
-- ✅ Detailed Purchase and Trial Account Reports
-- ✅ Tutorial Section with Admin-Customizable Content
-- ✅ Balance Management via Admin Panel
-- ✅ Multiple Admin Support
-- ✅ Manage Purchased Services:
-  - Renewals
-  - Additional Volume Purchases
-  - Configuration Retrieval
-  - Updating Service Links
-- ✅ FAQ Section
-- ✅ Text Customization from the Bot
-- ✅ Product and Panel Management
-- ✅ Admin-Specified Username Generation Methods
-- ✅ Configuration Settings Based on Protocols
-- ✅ Gateway Management
+**Bestify Mode** یک سیستم مدیریت پیشرفته برای فروش خدمات VPN است که با هدف ساده‌سازی فرایند‌های مدیریت کاربران، پرداخت‌ها، و ارائه خدمات طراحی شده است. این سیستم با پنل‌های مختلف مانند **Marzban** و **X-UI** سازگار است و یک رابط کاربری یکپارچه برای مدیریت تمام جنبه‌های کسب‌وکار VPN ارائه می‌دهد.
 
 ---
 
-### 🔹 **Subscription Version Features**
+## ⚙️ امکانات
 
-In addition to the features of the Free Version, the Subscription Version includes:
+### 🔹 **ویژگی‌های اصلی**
 
-- 🔐 Admin Access Levels (Management, Sales, Support)
-- 🧾 View and Manage All Users in the Bot
-- 🎟️ Advanced Discount Code Management
-- 🤝 Reseller Support
-- 💰 Refund and Service Removal Options
-- ⚡ Advanced Panel-Specific Bandwidth Management
-- 🔄 Manage Panel Status
-- 🔑 Separate Panels for Test Accounts
-- ⏳ Set Service Purchase Durations
-- 📤 Send Configurations Directly After Payment
-- 🔄 Renewal and Volume Purchases (Even for Non-Existing Services)
-- 💳 Inventory Control (Set Minimum and Maximum Inventory Increases)
-- 📩 Support Messages with Admin Responses
-- 🔗 Advanced Subset Management
-- 🛒 Bulk Purchase Options
-- 🆔 Multiple Username Creation Methods
-- 🔍 Quick Service Search
-- 📅 Advanced Cron Job Settings
-- 📊 Comprehensive Bot Statistics
-- ❌ Limit Configuration Creation per Panel
-- 🖥️ Web Panel Integration
-- 🌍 Change Location of Services
-- 🔄 Transfer Services Between Users
-- 💱 Rial Exchange Payment Gateways
-
-📌 **Subscription Purchase Guide**: [View Guide](https://t.me/mirzaperimium/4)
+- ✅ مدیریت یکپارچه کاربران
+- ✅ سیستم پرداخت چندگانه
+- ✅ پشتیبانی از پنل‌های متنوع
+- ✅ ساخت خودکار تنظیمات
+- ✅ مدیریت اشتراک‌ها و تمدید خودکار
+- ✅ گزارش‌های تحلیلی و آماری
+- ✅ رابط کاربری ادمین پیشرفته
+- ✅ سیستم مدیریت پشتیبانی کاربران
+- ✅ سیستم تیکت و پشتیبانی
+- ✅ سیستم نمایندگی و زیرمجموعه‌ها
+- ✅ مدیریت پهنای باند
+- ✅ سیستم هشدار و اطلاع‌رسانی
+- ✅ امکان شخصی‌سازی کامل متون و رابط کاربری
 
 ---
 
-## 🚀 Installation
+## 🚀 نصب و راه‌اندازی
 
-### Prerequisites
+### 📋 پیش‌نیازها
 
-Ensure you have the following before installation:
-- 🖥️ **Ubuntu Server 22**
-- 🌐 **A Domain Name**
+برای نصب Bestify Mode، موارد زیر مورد نیاز است:
+- 🖥️ **سرور Ubuntu 20.04 یا بالاتر**
+- 🌐 **یک دامنه یا ساب‌دامنه**
+- 🔑 **دسترسی به ریپوزیتوری خصوصی**
 
-### 🔧 Installing the Bot (Stable Version)
+### 💻 نصب برنامه
 
-Run the following command in your server terminal:
+برای نصب، دستور زیر را در ترمینال سرور خود اجرا کنید:
 
 ```bash
-curl -o install.sh -L https://raw.githubusercontent.com/mahdiMGF2/botmirzapanel/main/install.sh && bash install.sh
+bash <(curl -s https://example.com/path/to/install.sh)
 ```
 
-When prompted, **select option 1** to complete the installation.
+**توجه**: نصب این سیستم نیازمند دسترسی به ریپوزیتوری خصوصی است. برای دریافت راهنمایی درباره تنظیم کلید SSH، به بخش [دسترسی به ریپوزیتوری خصوصی](#-دسترسی-به-ریپوزیتوری-خصوصی) مراجعه کنید.
 
 ---
 
-### ⚠️ Beta Installation
+### 🔄 به‌روزرسانی
 
-💡 *Disclaimer*: This is a beta release. It may contain bugs or issues. Use it with caution and report any problems you encounter.
-
-To install the beta version, run:
+برای به‌روزرسانی سیستم به آخرین نسخه، دستور زیر را اجرا کنید:
 
 ```bash
-curl -o install.sh -L https://raw.githubusercontent.com/mahdiMGF2/botmirzapanel/main/install.sh && bash install.sh -beta
+cd /var/www/bestify_mode && bash install.sh -update
 ```
+
+همچنین می‌توانید برای به‌روزرسانی خودکار، گزینه مربوطه را در منوی نصب انتخاب کنید.
 
 ---
 
-## 🔄 updating bot
+### ❌ حذف کامل
 
-To update your bot to the latest version, use the following command:
+برای حذف کامل سیستم از سرور، دستور زیر را اجرا کنید:
 
 ```bash
-curl -o install.sh -L https://raw.githubusercontent.com/mahdiMGF2/botmirzapanel/main/install.sh && bash install.sh -update
+cd /var/www/bestify_mode && bash install.sh
 ```
+
+سپس گزینه 5 (حذف Bestify Mode) را انتخاب کنید.
 
 ---
 
-## ❌ removing
+## 👨‍💻 دسترسی به ریپوزیتوری خصوصی
 
-If you want to completely remove the bot from your server, run the following command:
+Bestify Mode یک پروژه خصوصی است و برای دسترسی به ریپوزیتوری آن، نیاز به تنظیم کلید SSH دارید:
+
+1. **ایجاد کلید SSH جدید**:
+```bash
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa_bestify
+```
+
+2. **اضافه کردن کلید عمومی به حساب GitHub**:
+   - محتوای فایل `~/.ssh/id_rsa_bestify.pub` را کپی کنید
+   - به حساب GitHub خود بروید: Settings > SSH and GPG keys > New SSH key
+   - کلید عمومی خود را اضافه کنید
+
+3. **تنظیم SSH Config**:
+```bash
+echo -e "Host github.com\n  IdentityFile ~/.ssh/id_rsa_bestify\n  User git" >> ~/.ssh/config
+```
+
+برای درخواست دسترسی به ریپوزیتوری، با مدیر پروژه تماس بگیرید.
+
+---
+
+## 🔄 مدیریت نسخه‌ها
+
+Bestify Mode با استفاده از سیستم تگ‌های Git، نسخه‌های مختلفی ارائه می‌دهد. برای مشاهده نسخه‌های موجود:
 
 ```bash
-curl -o install.sh -L https://raw.githubusercontent.com/mahdiMGF2/botmirzapanel/main/install.sh && bash install.sh
+cd /var/www/bestify_mode && bash install.sh -version
 ```
 
-When prompted, **select option 3** to remove the bot.
+برای تغییر به یک نسخه خاص، از طریق منوی نصب، گزینه 3 را انتخاب کرده و شماره نسخه مورد نظر را وارد کنید.
+
+### انتشار نسخه‌ها
+
+- **v1.0.0**: نسخه اولیه (پایدار)
+- **v1.1.0**: بهبود عملکرد و افزودن ویژگی‌های جدید
+- **v1.2.0**: رفع باگ‌ها و بهبود امنیت
 
 ---
 
-## 📱 Demo Bot
-
-Want to see Mirza Panel in action? Try the demo bot here:  
-👉 [Demo Bot](https://t.me/marzbaninfobot)
-
----
-
-## 💵 Financial Support
-
-If you find **Mirza Panel** helpful and would like to support its development, you can make a financial contribution via cryptocurrency.
-
-- **TRX Network (TRC20)**:  
-  `TNvwhpNtXxKMFFeVzGR8GNZ6gL4aECituU`
-
-Your support ensures continued updates and improvements for this project. Thank you! 🙌
-
-### Contributors
-
-![Contributors](https://contrib.rocks/image?repo=mahdiMGF2/botmirzapanel)
+توسعه‌داده شده توسط تیم Bestify Mode &copy; 2023-2024
