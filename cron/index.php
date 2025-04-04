@@ -345,9 +345,19 @@ if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" |
             'callback_data' => 'previous_page'
         ]
     ];
+    
+    // دکمه بررسی و حذف سرویس‌های غیرفعال
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی و حذف سرویس‌های غیرفعال",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
+    
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
     $keyboard_json = json_encode($keyboardlists);
     if ($datain == "backorder") {
@@ -397,9 +407,16 @@ if ($datain == 'next_page') {
             'callback_data' => 'usernotlist'
         ]
     ];
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی و حذف سرویس‌های غیرفعال",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
     $keyboard_json = json_encode($keyboardlists);
     update("user", "pagenumber", $next_page, "id", $from_id);
@@ -443,9 +460,16 @@ if ($datain == 'next_page') {
             'callback_data' => 'usernotlist'
         ]
     ];
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی و حذف سرویس‌های غیرفعال",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
     $keyboard_json = json_encode($keyboardlists);
     update("user", "pagenumber", $next_page, "id", $from_id);
@@ -454,6 +478,181 @@ if ($datain == 'next_page') {
 if ($datain == "usernotlist") {
     sendmessage($from_id, $textbotlang['users']['stateus']['SendUsername'], $backuser, 'html');
     step('getusernameinfo', $from_id);
+} elseif ($datain == "check_invalid_services") {
+    // بررسی همه سرویس‌های کاربر
+    $invalid_services = [];
+    
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // بررسی هر سرویس در مرزبان
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        // اگر پنل مرزبان وجود داشت
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            // اگر کاربر در پنل وجود نداشت
+            if (isset($DataUserOut['status']) && $DataUserOut['status'] == "Unsuccessful") {
+                $invalid_services[] = [
+                    'username' => $username,
+                    'location' => $location,
+                    'id_invoice' => $service['id_invoice']
+                ];
+            }
+        }
+    }
+    
+    // اگر سرویس غیرفعالی پیدا نشد
+    if (count($invalid_services) == 0) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "✅ همه سرویس‌های شما فعال هستند و در پنل‌ها وجود دارند.",
+            'show_alert' => true
+        ]);
+        return;
+    }
+    
+    // نمایش لیست سرویس‌های غیرفعال به کاربر
+    $text = "⚠️ سرویس‌های زیر در پنل‌های مرزبان یافت نشدند:\n\n";
+    $keyboard = ['inline_keyboard' => []];
+    
+    foreach ($invalid_services as $service) {
+        $text .= "👤 نام کاربری: <code>" . $service['username'] . "</code>\n";
+        $text .= "📡 لوکیشن: " . $service['location'] . "\n";
+        $text .= "🔢 شماره فاکتور: " . $service['id_invoice'] . "\n";
+        $text .= "〰️〰️〰️〰️〰️〰️〰️〰️〰️〰️\n";
+        
+        $keyboard['inline_keyboard'][] = [
+            ['text' => "❌ حذف " . $service['username'], 'callback_data' => 'remove_invalid_service_' . $service['id_invoice']]
+        ];
+    }
+    
+    $keyboard['inline_keyboard'][] = [
+        ['text' => "❌ حذف همه موارد", 'callback_data' => 'remove_all_invalid_services']
+    ];
+    
+    $keyboard['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به لیست سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    Editmessagetext($from_id, $message_id, $text, json_encode($keyboard));
+    return;
+} elseif (preg_match('/remove_invalid_service_(.*)/', $datain, $dataget)) {
+    $id_invoice = $dataget[1];
+    $invoice = select("invoice", "*", "id_invoice", $id_invoice, "select");
+    
+    if ($invoice) {
+        update("invoice", "Status", "deleted", "id_invoice", $id_invoice);
+        
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "✅ سرویس " . $invoice['username'] . " با موفقیت حذف شد.",
+            'show_alert' => true
+        ]);
+        
+        // بازگشت به صفحه لیست سرویس‌های غیرفعال
+        $datain = "check_invalid_services";
+        // اجرای مجدد این قسمت از کد
+        $invalid_services = [];
+        
+        $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+        $stmt->bindParam(':id_user', $from_id);
+        $stmt->execute();
+        $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($services as $service) {
+            $username = $service['username'];
+            $location = $service['Service_location'];
+            $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+            
+            if ($marzban_list_get) {
+                $DataUserOut = $ManagePanel->DataUser($location, $username);
+                
+                if (isset($DataUserOut['status']) && $DataUserOut['status'] == "Unsuccessful") {
+                    $invalid_services[] = [
+                        'username' => $username,
+                        'location' => $location,
+                        'id_invoice' => $service['id_invoice']
+                    ];
+                }
+            }
+        }
+        
+        if (count($invalid_services) == 0) {
+            sendmessage($from_id, "✅ همه سرویس‌های غیرفعال حذف شدند.", null, 'HTML');
+            $datain = "backorder";
+            return;
+        }
+        
+        $text = "⚠️ سرویس‌های زیر در پنل‌های مرزبان یافت نشدند:\n\n";
+        $keyboard = ['inline_keyboard' => []];
+        
+        foreach ($invalid_services as $service) {
+            $text .= "👤 نام کاربری: <code>" . $service['username'] . "</code>\n";
+            $text .= "📡 لوکیشن: " . $service['location'] . "\n";
+            $text .= "🔢 شماره فاکتور: " . $service['id_invoice'] . "\n";
+            $text .= "〰️〰️〰️〰️〰️〰️〰️〰️〰️〰️\n";
+            
+            $keyboard['inline_keyboard'][] = [
+                ['text' => "❌ حذف " . $service['username'], 'callback_data' => 'remove_invalid_service_' . $service['id_invoice']]
+            ];
+        }
+        
+        $keyboard['inline_keyboard'][] = [
+            ['text' => "❌ حذف همه موارد", 'callback_data' => 'remove_all_invalid_services']
+        ];
+        
+        $keyboard['inline_keyboard'][] = [
+            ['text' => "🔙 بازگشت به لیست سرویس‌ها", 'callback_data' => 'backorder']
+        ];
+        
+        Editmessagetext($from_id, $message_id, $text, json_encode($keyboard));
+        return;
+    }
+} elseif ($datain == "remove_all_invalid_services") {
+    $invalid_services = [];
+    
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if (isset($DataUserOut['status']) && $DataUserOut['status'] == "Unsuccessful") {
+                update("invoice", "Status", "deleted", "id_invoice", $service['id_invoice']);
+                $invalid_services[] = $service['username'];
+            }
+        }
+    }
+    
+    if (count($invalid_services) > 0) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "✅ تعداد " . count($invalid_services) . " سرویس غیرفعال با موفقیت حذف شدند.",
+            'show_alert' => true
+        ]);
+    } else {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "⚠️ هیچ سرویس غیرفعالی یافت نشد.",
+            'show_alert' => true
+        ]);
+    }
+    
+    $datain = "backorder";
 }
 if ($user['step'] == "getusernameinfo") {
     // Validate and sanitize the username
