@@ -1623,8 +1623,10 @@ if ($text == $datatextbot['text_account']) {
     $keyboard_user_account = json_encode([
         'inline_keyboard' => [
             [
-                ['text' => "🔄 تمدید خودکار اشتراک", 'callback_data' => "auto_renewal"],
                 ['text' => "🎁 کد هدیه", 'callback_data' => "gift_code"]
+            ],
+            [
+                ['text' => "🔄 تمدید خودکار اشتراک", 'callback_data' => "auto_renewal"]
             ]
         ]
     ]);
