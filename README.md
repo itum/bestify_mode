@@ -164,7 +164,7 @@ After setting up SSH access, you can clone the repository:
 
 ```bash
 sudo mkdir -p /var/www
-sudo GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_bestify" git clone git@github.com:username/bestify_mode.git /var/www/bestify_mode
+sudo GIT_SSH_COMMAND="ssh -i ~/.ssh/id_rsa_bestify" git clone git@github.com:itum/bestify_mode.git /var/www/bestify_mode
 ```
 
 Contact the repository administrator to request access if needed.

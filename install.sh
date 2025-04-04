@@ -28,7 +28,7 @@ function show_logo() {
 }
 
 # Configuration variables
-REPO_URL="git@github.com:username/bestify_mode.git"
+REPO_URL="git@github.com:itum/bestify_mode.git"
 INSTALL_DIR="/var/www/bestify_mode"
 SSH_KEY_DIR="/root/.ssh"
 SSH_KEY_FILE="${SSH_KEY_DIR}/id_rsa_bestify"
