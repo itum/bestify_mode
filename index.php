@@ -1623,7 +1623,8 @@ if ($text == $datatextbot['text_account']) {
     $keyboard_user_account = json_encode([
         'inline_keyboard' => [
             [
-                ['text' => "🔄 تمدید خودکار اشتراک", 'callback_data' => "auto_renewal"]
+                ['text' => "🔄 تمدید خودکار اشتراک", 'callback_data' => "auto_renewal"],
+                ['text' => "🎁 کد هدیه", 'callback_data' => "gift_code"]
             ]
         ]
     ]);
@@ -1717,6 +1718,13 @@ if ($text == $datatextbot['text_account']) {
     
     sendmessage($from_id, $status_message, $keyboard_back, 'HTML');
 }
+
+// Gift code handler
+elseif ($datain == "gift_code") {
+    sendmessage($from_id, $textbotlang['users']['Discount']['getcode'], $backuser, 'HTML');
+    step('get_code_user', $from_id);
+}
+
 if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     $locationproduct = select("marzban_panel", "*", "status", "activepanel", "count");
     if ($locationproduct == 0) {
