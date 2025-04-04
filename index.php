@@ -1605,13 +1605,117 @@ if ($datain == "fqQuestions") {
     sendmessage($from_id, $datatextbot['text_dec_fq'], null, 'HTML');
 }
 if ($text == $datatextbot['text_account']) {
-    $dateacc = jdate('Y/m/d');
-    $timeacc = jdate('H:i:s', time());
-    $first_name = htmlspecialchars($first_name);
-    $Balanceuser = number_format($user['Balance'], 0);
-    $countorder = select("invoice", "id_user", 'id_user', $from_id, "count");
-    $text_account = sprintf($textbotlang['users']['account'],$first_name,$from_id,$Balanceuser,$countorder,$user['affiliatescount'],$dateacc,$timeacc);
-    sendmessage($from_id, $text_account, $keyboardPanel, 'HTML');
+    $datecc = jdate('Y/m/d');
+    $timecc = jdate('H:i:s');
+    $user_count_service = count(select("invoice", "*", "id_user", $from_id,"fetchAll"));
+    $userinfo = select("user", "*", "id", $from_id, "select");
+    $userbalance = number_format($userinfo['Balance'], 0);
+    $formatted_text = sprintf($textbotlang['users']['account'],
+        $first_name,
+        $from_id,
+        $userbalance,
+        $user_count_service,
+        $userinfo['affiliatescount'],
+        $datecc,
+        $timecc);
+    
+    // افزودن دکمه تمدید خودکار به منوی مشخصات کاربری
+    $keyboard_user_account = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔄 تمدید خودکار اشتراک", 'callback_data' => "auto_renewal"]
+            ]
+        ]
+    ]);
+    
+    sendmessage($from_id, $formatted_text, $keyboard_user_account, 'HTML');
+    step('home', $from_id);
+} elseif ($datain == "auto_renewal") {
+    // دریافت لیست سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_volume')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    if (count($services) == 0) {
+        sendmessage($from_id, "❌ شما هیچ سرویس فعالی ندارید.", $keyboard, 'HTML');
+        return;
+    }
+    
+    // ایجاد کیبورد اینلاین برای نمایش سرویس‌ها
+    $keyboard_services = ['inline_keyboard' => []];
+    
+    foreach ($services as $service) {
+        // بررسی وضعیت تمدید خودکار سرویس
+        $auto_renewal = isset($service['auto_renewal']) ? $service['auto_renewal'] : 'inactive';
+        $status_text = ($auto_renewal == 'active') ? "✅" : "❌";
+        
+        $keyboard_services['inline_keyboard'][] = [
+            ['text' => $service['username'] . " - " . $service['name_product'] . " (" . $status_text . ")", 'callback_data' => "toggle_renewal_" . $service['username']]
+        ];
+    }
+    
+    $keyboard_services['inline_keyboard'][] = [
+        ['text' => "🏠 بازگشت به منوی اصلی", 'callback_data' => "backuser"]
+    ];
+    
+    $keyboard_services = json_encode($keyboard_services);
+    
+    sendmessage($from_id, "📋 لیست سرویس‌های شما برای تنظیم تمدید خودکار:
+    
+✅ = تمدید خودکار فعال
+❌ = تمدید خودکار غیرفعال
+
+برای تغییر وضعیت تمدید خودکار روی سرویس مورد نظر کلیک کنید.", $keyboard_services, 'HTML');
+    
+} elseif (preg_match('/toggle_renewal_(.*)/', $datain, $matches)) {
+    $username = $matches[1];
+    
+    // بررسی وجود سرویس و مالکیت آن
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE username = :username AND id_user = :id_user");
+    $stmt->bindParam(':username', $username);
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $service = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if (!$service) {
+        sendmessage($from_id, "❌ سرویس مورد نظر یافت نشد یا متعلق به شما نیست.", $keyboard, 'HTML');
+        return;
+    }
+    
+    // تغییر وضعیت تمدید خودکار
+    $current_status = isset($service['auto_renewal']) ? $service['auto_renewal'] : 'inactive';
+    $new_status = ($current_status == 'active') ? 'inactive' : 'active';
+    
+    // بررسی آیا ستون auto_renewal در جدول وجود دارد
+    try {
+        $stmt = $pdo->prepare("UPDATE invoice SET auto_renewal = :auto_renewal WHERE username = :username");
+        $stmt->bindParam(':auto_renewal', $new_status);
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+    } catch (PDOException $e) {
+        // اگر ستون وجود ندارد، آن را اضافه کنیم
+        $pdo->exec("ALTER TABLE invoice ADD COLUMN auto_renewal VARCHAR(20) DEFAULT 'inactive'");
+        
+        // دوباره تلاش کنیم
+        $stmt = $pdo->prepare("UPDATE invoice SET auto_renewal = :auto_renewal WHERE username = :username");
+        $stmt->bindParam(':auto_renewal', $new_status);
+        $stmt->bindParam(':username', $username);
+        $stmt->execute();
+    }
+    
+    // نمایش پیام موفقیت
+    $status_message = ($new_status == 'active') ? "✅ تمدید خودکار برای سرویس $username فعال شد. در صورت پایان زمان سرویس و داشتن موجودی کافی، سرویس شما به صورت خودکار تمدید خواهد شد." : "❌ تمدید خودکار برای سرویس $username غیرفعال شد.";
+    
+    $keyboard_back = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 بازگشت به لیست سرویس‌ها", 'callback_data' => "auto_renewal"]
+            ]
+        ]
+    ]);
+    
+    sendmessage($from_id, $status_message, $keyboard_back, 'HTML');
 }
 if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     $locationproduct = select("marzban_panel", "*", "status", "activepanel", "count");
