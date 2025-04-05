@@ -1276,20 +1276,8 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
         
-        // ساخت کیبورد با دکمه بازگشت
-        $back_keyboard = json_encode([
-            'inline_keyboard' => [
-                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
-                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
-            ]
-        ]);
-        
-        // ویرایش پیام قبلی به جای ارسال پیام جدید
-        if (isset($message_id)) {
-            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
-        } else {
-            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
-        }
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
+        sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
         step('get_step_payment', $from_id);
         return;
     }
@@ -1431,20 +1419,8 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
         
-        // ساخت کیبورد با دکمه بازگشت
-        $back_keyboard = json_encode([
-            'inline_keyboard' => [
-                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
-                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
-            ]
-        ]);
-        
-        // ویرایش پیام قبلی به جای ارسال پیام جدید
-        if (isset($message_id)) {
-            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
-        } else {
-            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
-        }
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
+        sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
         step('get_step_payment', $from_id);
         return;
     }
@@ -1597,21 +1573,9 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $volume_price . ", Shortage=" . $shortage);
         
-        // ساخت کیبورد با دکمه بازگشت
-        $back_keyboard = json_encode([
-            'inline_keyboard' => [
-                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
-                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
-            ]
-        ]);
-        
-        // ویرایش پیام قبلی به جای ارسال پیام جدید
-        if (isset($message_id)) {
-            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
-        } else {
-            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
-        }
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
+        return;
     }
     
     // کم کردن موجودی با قیمت نهایی (با تخفیف اگر نماینده باشد)
@@ -1882,7 +1846,17 @@ if ($user['step'] == "createusertest" || preg_match('/locationtests_(.*)/', $dat
             ]
         ]
     ]);
-    $textcreatuser = sprintf($textbotlang['users']['buy']['createservicetest'],$username_ac,$marzban_list_get['name_panel'],$setting['time_usertest'],$setting['val_usertest'],$output_config_link,$text_config);
+    
+    // بررسی اگر کاربر نماینده است
+    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+    if ($checkAgency && $checkAgency['status'] == 'approved') {
+        // استفاده از متن مخصوص نمایندگان بدون نمایش قیمت
+        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice-agent'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
+    } else {
+        // استفاده از متن معمولی برای کاربران عادی
+        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
+    }
+    
     if ($marzban_list_get['sublink'] == "onsublink") {
         $urlimage = "$from_id$randomString.png";
         $writer = new PngWriter();
@@ -1979,49 +1953,6 @@ if ($text == $datatextbot['text_account']) {
     $user_count_service = count(select("invoice", "*", "id_user", $from_id,"fetchAll"));
     $userinfo = select("user", "*", "id", $from_id, "select");
     $userbalance = number_format($userinfo['Balance'], 0);
-    
-    // آمار جدید
-    // تاریخ آخرین سفارش
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user ORDER BY id DESC LIMIT 1");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $last_order = $stmt->fetch(PDO::FETCH_ASSOC);
-    $last_order_date = ($last_order) ? jdate('Y/m/d', strtotime($last_order['date_buy'])) : '-';
-    
-    // تعداد سفارشات موفق
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE id_user = :id_user AND status IN ('active', 'expired')");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $successful_orders = $stmt->fetchColumn();
-    
-    // تعداد اشتراک‌های دریافتی
-    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE id_user = :id_user");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $total_subscriptions = $stmt->fetchColumn();
-    
-    // مجموع پرداختی
-    $stmt = $pdo->prepare("SELECT SUM(price) FROM invoice WHERE id_user = :id_user");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $total_payments = number_format($stmt->fetchColumn() ?: 0, 0);
-    
-    // مصرف کل ترافیک
-    $stmt = $pdo->prepare("SELECT SUM(volume_used) FROM invoice WHERE id_user = :id_user");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $total_traffic = formatBytes($stmt->fetchColumn() ?: 0);
-    
-    // تاریخ عضویت
-    $join_date = jdate('Y/m/d', strtotime($userinfo['date']));
-    
-    // پرتکرارترین سفارش
-    $stmt = $pdo->prepare("SELECT name_product, COUNT(*) as count FROM invoice WHERE id_user = :id_user GROUP BY name_product ORDER BY count DESC LIMIT 1");
-    $stmt->bindParam(':id_user', $from_id);
-    $stmt->execute();
-    $most_ordered = $stmt->fetch(PDO::FETCH_ASSOC);
-    $most_ordered_product = ($most_ordered) ? $most_ordered['name_product'] : '-';
-    
     $formatted_text = sprintf($textbotlang['users']['account'],
         $first_name,
         $from_id,
@@ -2030,16 +1961,6 @@ if ($text == $datatextbot['text_account']) {
         $userinfo['affiliatescount'],
         $datecc,
         $timecc);
-    
-    // افزودن آمار جدید به متن
-    $formatted_text .= "\n\n🌀 تاریخ آخرین سفارش :\n$last_order_date\n";
-    $formatted_text .= "\n🧢 میدونستی که تا الان  :";
-    $formatted_text .= "\n🗳️ $successful_orders سفارش موفق داشتی!";
-    $formatted_text .= "\n🔗 $total_subscriptions تا اشتراک دریافت کردی!";
-    $formatted_text .= "\n💲 $total_payments تومان پرداختی داشتی!";
-    $formatted_text .= "\n📊 $total_traffic مصرف کل ترافیک داشتی!";
-    $formatted_text .= "\n📅 از تاریخ $join_date عضو ربات شدی!";
-    $formatted_text .= "\n🔄 پر تکرار ترین سفارشت: $most_ordered_product";
     
     // افزودن دکمه تمدید خودکار به منوی مشخصات کاربری
     $keyboard_user_account = json_encode([
@@ -2351,7 +2272,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment_agency, 'HTML');
         } else {
-        sendmessage($from_id, $textin, $payment_agency, 'HTML');
+            sendmessage($from_id, $textin, $payment_agency, 'HTML');
         }
         step('payment', $from_id);
     } else {
@@ -2369,7 +2290,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment, 'HTML');
         } else {
-        sendmessage($from_id, $textin, $payment, 'HTML');
+            sendmessage($from_id, $textin, $payment, 'HTML');
         }
         step('payment', $from_id);
     }
@@ -2454,20 +2375,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             error_log("Debug error message: " . $error_message);
             error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
             
-            // ساخت کیبورد با دکمه بازگشت
-            $back_keyboard = json_encode([
-                'inline_keyboard' => [
-                    [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
-                    [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
-                ]
-            ]);
-            
-            // ویرایش پیام قبلی به جای ارسال پیام جدید
-            if (isset($message_id)) {
-                Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
-            } else {
-                sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
-            }
+            sendmessage($from_id, $error_message, $step_payment, 'HTML');
             step('get_step_payment', $from_id);
             
             // ایجاد فاکتور پرداخت نشده
@@ -2574,6 +2482,10 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         
         // ثبت خطا در فایل لاگ برای بررسی
         error_log("Debug error message: " . $error_message);
+        error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
+        
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
+        step('get_step_payment', $from_id);
         $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time,Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)");
         $Status =  "unpaid";
         $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
@@ -2704,7 +2616,17 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             ]
         ]
     ]);
-    $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
+    
+    // بررسی اگر کاربر نماینده است
+    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+    if ($checkAgency && $checkAgency['status'] == 'approved') {
+        // استفاده از متن مخصوص نمایندگان بدون نمایش قیمت
+        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice-agent'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
+    } else {
+        // استفاده از متن معمولی برای کاربران عادی
+        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
+    }
+    
     if ($marzban_list_get['sublink'] == "onsublink") {
         $urlimage = "$from_id$randomString.png";
         $writer = new PngWriter();

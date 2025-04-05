@@ -281,7 +281,17 @@ function DirectPayment($order_id){
             }
         }
         $Shoppinginfo = json_encode($Shoppinginfo);
-        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$dataoutput['username'],$get_invoice['name_product'],$marzban_list_get['name_panel'],$get_invoice['Service_time'],$get_invoice['Volume'],$config,$output_config_link);
+        
+        // بررسی اگر کاربر نماینده است
+        $checkAgency = select("agency", "*", "user_id", $get_invoice['id_user'], "select");
+        if ($checkAgency && $checkAgency['status'] == 'approved') {
+            // استفاده از متن مخصوص نمایندگان بدون نمایش قیمت
+            $textcreatuser = sprintf($textbotlang['users']['buy']['createservice-agent'],$dataoutput['username'],$get_invoice['name_product'],$marzban_list_get['name_panel'],$get_invoice['Service_time'],$get_invoice['Volume'],$config,$output_config_link);
+        } else {
+            // استفاده از متن معمولی برای کاربران عادی
+            $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$dataoutput['username'],$get_invoice['name_product'],$marzban_list_get['name_panel'],$get_invoice['Service_time'],$get_invoice['Volume'],$config,$output_config_link);
+        }
+        
         if ($marzban_list_get['configManual'] == "onconfig") {
             if (count($dataoutput['configs']) == 1) {
                 $urlimage = "{$get_invoice['id_user']}$randomString.png";
