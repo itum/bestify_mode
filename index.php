@@ -2259,7 +2259,11 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         ]);
         
         // ارسال پیام با کیبورد مناسب
-        sendmessage($from_id, $textin, $payment_agency, 'HTML');
+        if (isset($message_id)) {
+            Editmessagetext($from_id, $message_id, $textin, $payment_agency, 'HTML');
+        } else {
+            sendmessage($from_id, $textin, $payment_agency, 'HTML');
+        }
         step('payment', $from_id);
     } else {
         // متن فاکتور معمولی
@@ -2273,7 +2277,11 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         );
         
         // ارسال پیام با کیبورد معمولی
-        sendmessage($from_id, $textin, $payment, 'HTML');
+        if (isset($message_id)) {
+            Editmessagetext($from_id, $message_id, $textin, $payment, 'HTML');
+        } else {
+            sendmessage($from_id, $textin, $payment, 'HTML');
+        }
         step('payment', $from_id);
     }
 } elseif ($user['step'] == "payment" && $datain == "confirmandgetservice" || $datain == "confirmandgetserviceDiscount") {
