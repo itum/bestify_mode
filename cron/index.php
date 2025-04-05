@@ -999,7 +999,21 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     if ($user['Balance'] < $product['price_product']) {
         $Balance_prim = $product['price_product'] - $user['Balance'];
         update("user", "Processing_value", $Balance_prim, "id", $from_id);
-        sendmessage($from_id, $textbotlang['users']['sell']['None-credit'], $step_payment, 'HTML');
+        // فرمت کردن مقادیر برای نمایش
+        $user_balance = number_format($user['Balance']);
+        $product_price = number_format($final_price);
+        $shortage = number_format($Balance_prim);
+        
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $product_price . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+        
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
         sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
         step('get_step_payment', $from_id);
         return;
@@ -1126,7 +1140,14 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $product_price, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $product_price . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
@@ -1252,7 +1273,14 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $volume_price, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $volume_price . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
@@ -1909,7 +1937,14 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             $shortage = number_format($Balance_prim);
             
             // ایجاد پیام خطا با مقادیر مورد نیاز
-            $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $price_format, $shortage);
+            $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $price_format . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
             
             sendmessage($from_id, $error_message, $step_payment, 'HTML');
             step('get_step_payment', $from_id);
@@ -2007,7 +2042,14 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $price_format, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $price_format . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);

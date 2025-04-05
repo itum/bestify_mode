@@ -1258,7 +1258,25 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     if ($user['Balance'] < $final_price) {
         $Balance_prim = $final_price - $user['Balance'];
         update("user", "Processing_value", $Balance_prim, "id", $from_id);
-        sendmessage($from_id, $textbotlang['users']['sell']['None-credit'], $step_payment, 'HTML');
+        
+        // فرمت کردن مقادیر برای نمایش
+        $user_balance = number_format($user['Balance']);
+        $product_price = number_format($final_price);
+        $shortage = number_format($Balance_prim);
+        
+        // ایجاد پیام خطا با مقادیر مورد نیاز - استفاده از str_replace به جای sprintf
+        $error_template = $textbotlang['users']['sell']['None-credit'];
+        $error_message = str_replace(
+            ['{user_balance}', '{price}', '{shortage}'],
+            [$user_balance, $product_price, $shortage],
+            $error_template
+        );
+        
+        // ثبت خطا در فایل لاگ برای بررسی
+        error_log("Debug error message: " . $error_message);
+        error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
+        
+        sendmessage($from_id, $error_message, $step_payment, 'HTML');
         sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
         step('get_step_payment', $from_id);
         return;
@@ -1388,7 +1406,18 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $product_price, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $product_price . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+        
+        // ثبت خطا در فایل لاگ برای بررسی
+        error_log("Debug error message: " . $error_message);
+        error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
@@ -1531,7 +1560,18 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $volume_price, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $volume_price . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+        
+        // ثبت خطا در فایل لاگ برای بررسی
+        error_log("Debug error message: " . $error_message);
+        error_log("Values: Balance=" . $user_balance . ", Price=" . $volume_price . ", Shortage=" . $shortage);
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
@@ -2304,7 +2344,18 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             $shortage = number_format($Balance_prim);
             
             // ایجاد پیام خطا با مقادیر مورد نیاز
-            $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $price_format, $shortage);
+            $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $price_format . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+            
+            // ثبت خطا در فایل لاگ برای بررسی
+            error_log("Debug error message: " . $error_message);
+            error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
             
             sendmessage($from_id, $error_message, $step_payment, 'HTML');
             step('get_step_payment', $from_id);
@@ -2402,7 +2453,18 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
-        $error_message = sprintf($textbotlang['users']['sell']['None-credit'], $user_balance, $price_format, $shortage);
+        $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی حساب کاربری شما کافی نمی باشد
+
+💰 موجودی فعلی شما: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $price_format . " تومان
+⚠️ کمبود اعتبار: " . $shortage . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+        
+        // ثبت خطا در فایل لاگ برای بررسی
+        error_log("Debug error message: " . $error_message);
+        error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
