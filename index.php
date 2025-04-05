@@ -322,9 +322,10 @@ if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" |
         'inline_keyboard' => [],
     ];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
         $keyboardlists['inline_keyboard'][] = [
             [
-                'text' => "🌟" . $row['username'] . "🌟",
+                'text' => "🌟" . $display_text . "🌟",
                 'callback_data' => "product_" . $row['username']
             ],
         ];
@@ -384,9 +385,10 @@ if ($datain == 'next_page') {
         'inline_keyboard' => [],
     ];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
         $keyboardlists['inline_keyboard'][] = [
             [
-                'text' => "🌟️" . $row['username'] . "🌟️",
+                'text' => "🌟️" . $display_text . "🌟️",
                 'callback_data' => "product_" . $row['username']
             ],
         ];
@@ -431,9 +433,10 @@ if ($datain == 'next_page') {
         'inline_keyboard' => [],
     ];
     while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
         $keyboardlists['inline_keyboard'][] = [
             [
-                'text' => "🌟️" . $row['username'] . "🌟️",
+                'text' => "🌟️" . $display_text . "🌟️",
                 'callback_data' => "product_" . $row['username']
             ],
         ];
@@ -668,24 +671,15 @@ if ($user['step'] == "getusernameinfo") {
     }
     #-------------[ status ]----------------#
     $status = $DataUserOut['status'];
-    if($DataUserOut['status'] == "active")
-    {
-        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
-    }
-    else{
-        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
-    }
+    $status_var = [
+        'active' => $textbotlang['users']['stateus']['active'],
+        'limited' => $textbotlang['users']['stateus']['limited'],
+        'disabled' => $textbotlang['users']['stateus']['disabled'],
+        'expired' => $textbotlang['users']['stateus']['expired'],
+        'on_hold' => $textbotlang['users']['stateus']['onhold']
+    ][$status];
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
-    $date = strtotime(date("Y-m-d H:i:s"));
-    $expiryTimestamp = strtotime($DataUserOut['expire']);
-    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
-    if ($remaining_days < 0) {
-        $abs_remaining_days = abs($remaining_days);
-        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
-    } else {
-        $day = $remaining_days . "روز";
-    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
@@ -778,24 +772,15 @@ if (preg_match('/product_(\w+)/', $datain, $dataget)) {
     }
     #-------------status----------------#
     $status = $DataUserOut['status'];
-    if($DataUserOut['status'] == "active")
-    {
-        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
-    }
-    else{
-        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
-    }
+    $status_var = [
+        'active' => $textbotlang['users']['stateus']['active'],
+        'limited' => $textbotlang['users']['stateus']['limited'],
+        'disabled' => $textbotlang['users']['stateus']['disabled'],
+        'expired' => $textbotlang['users']['stateus']['expired'],
+        'on_hold' => $textbotlang['users']['stateus']['onhold']
+    ][$status];
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
-    $date = strtotime(date("Y-m-d H:i:s"));
-    $expiryTimestamp = strtotime($DataUserOut['expire']);
-    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
-    if ($remaining_days < 0) {
-        $abs_remaining_days = abs($remaining_days);
-        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
-    } else {
-        $day = $remaining_days . "روز";
-    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
@@ -818,6 +803,9 @@ if (preg_match('/product_(\w+)/', $datain, $dataget)) {
                     ['text' => $textbotlang['users']['Extra_volume']['sellextra'], 'callback_data' => 'Extra_volume_' . $username],
                 ],
                 [
+                    ['text' => '🏷 نام نمایشی', 'callback_data' => 'display_name_' . $username],
+                ],
+                [
                     ['text' => $textbotlang['users']['stateus']['backlist'], 'callback_data' => 'backorder'],
                 ]
             ]
@@ -838,6 +826,9 @@ if (preg_match('/product_(\w+)/', $datain, $dataget)) {
                 [
                     ['text' => $textbotlang['users']['removeconfig']['btnremoveuser'], 'callback_data' => 'removeserviceuserco-' . $username],
                     ['text' => $textbotlang['users']['Extra_volume']['sellextra'], 'callback_data' => 'Extra_volume_' . $username],
+                ],
+                [
+                    ['text' => '🏷 نام نمایشی', 'callback_data' => 'display_name_' . $username],
                 ],
                 [
                     ['text' => $textbotlang['users']['stateus']['backlist'], 'callback_data' => 'backorder'],
@@ -1380,24 +1371,15 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $DataUserOut = $ManagePanel->DataUser($marzban_list_get['name_panel'], $usernamepanel);
     #-------------status----------------#
     $status = $DataUserOut['status'];
-    if($DataUserOut['status'] == "active")
-    {
-        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
-    }
-    else{
-        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
-    }
+    $status_var = [
+        'active' => $textbotlang['users']['stateus']['active'],
+        'limited' => $textbotlang['users']['stateus']['limited'],
+        'disabled' => $textbotlang['users']['stateus']['disabled'],
+        'expired' => $textbotlang['users']['stateus']['expired'],
+        'on_hold' => $textbotlang['users']['stateus']['onhold']
+    ][$status];
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
-    $date = strtotime(date("Y-m-d H:i:s"));
-    $expiryTimestamp = strtotime($DataUserOut['expire']);
-    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
-    if ($remaining_days < 0) {
-        $abs_remaining_days = abs($remaining_days);
-        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
-    } else {
-        $day = $remaining_days . "روز";
-    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
@@ -2925,5 +2907,74 @@ if ($text == $textbotlang['users']['agency']['request_button']) {
     sendmessage($from_id, $textbotlang['users']['agency']['request_sent'], $keyboard, 'html');
     update("user", "step", "none", "id", $from_id);
 }
+
+// پردازش دکمه نام نمایشی
+if (preg_match('/display_name_(\w+)/', $datain, $dataget)) {
+    $username = $dataget[1];
+    $nameloc = select("invoice", "*", "username", $username, "select");
+    
+    // ذخیره نام کاربری سرویس برای پردازش مرحله بعدی
+    update("user", "Processing_value", $username, "id", $from_id);
+    update("user", "step", "set_display_name", "id", $from_id);
+    
+    // نمایش نام نمایشی فعلی اگر وجود داشته باشد
+    $current_display_name = $nameloc['display_name'] ? $nameloc['display_name'] : "تنظیم نشده";
+    
+    $text = "🏷 لطفاً نام نمایشی دلخواه برای سرویس خود را وارد کنید.
+
+نام نمایشی فعلی: {$current_display_name}
+
+این نام برای شناسایی راحت‌تر سرویس شما استفاده می‌شود.";
+    
+    // دکمه برگشت به صفحه سرویس
+    $keyboard_back = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 بازگشت", 'callback_data' => "product_" . $username]
+            ]
+        ]
+    ]);
+    
+    Editmessagetext($from_id, $message_id, $text, $keyboard_back);
+}
+
+// دریافت ورودی کاربر برای نام نمایشی
+elseif ($user['step'] == "set_display_name") {
+    if ($datain == "product_" . $user['Processing_value']) {
+        // اگر کاربر روی دکمه بازگشت کلیک کرد
+        update("user", "step", "none", "id", $from_id);
+        return;
+    }
+    
+    $username = $user['Processing_value'];
+    $display_name = $text;
+    
+    // محدودیت طول نام نمایشی
+    if (mb_strlen($display_name) > 50) {
+        sendmessage($from_id, "❌ نام نمایشی نمی‌تواند بیش از 50 کاراکتر باشد. لطفاً نام کوتاه‌تری وارد کنید.", null, 'html');
+        return;
+    }
+    
+    // بروزرسانی نام نمایشی در پایگاه داده
+    update("invoice", "display_name", $display_name, "username", $username);
+    
+    // تنظیم مجدد مرحله کاربر
+    update("user", "step", "none", "id", $from_id);
+    
+    // ارسال پیام موفقیت
+    sendmessage($from_id, "✅ نام نمایشی سرویس با موفقیت به «{$display_name}» تغییر یافت.", $keyboard, 'html');
+    
+    // نمایش مجدد صفحه سرویس
+    $keyboardback = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔄 مشاهده اطلاعات سرویس", 'callback_data' => "product_" . $username],
+            ],
+        ]
+    ]);
+    
+    sendmessage($from_id, "برای مشاهده اطلاعات سرویس خود، روی دکمه زیر کلیک کنید:", $keyboardback, 'html');
+}
+
 require_once 'admin.php';
 $connect->close();

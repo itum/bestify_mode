@@ -477,6 +477,7 @@ try {
         price_product varchar(2000) NULL,
         Volume varchar(2000) NULL,
         Service_time varchar(200) NULL,
+        display_name varchar(2000) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL,
         Status varchar(200) NULL)
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
@@ -491,6 +492,10 @@ try {
         $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'Status'");
         if (mysqli_num_rows($Check_filde) != 1) {
             $result = $connect->query("ALTER TABLE invoice ADD Status VARCHAR(2000)");
+        }
+        $Check_filde = $connect->query("SHOW COLUMNS FROM invoice LIKE 'display_name'");
+        if (mysqli_num_rows($Check_filde) != 1) {
+            $result = $connect->query("ALTER TABLE invoice ADD display_name VARCHAR(2000) CHARACTER SET utf8mb4 COLLATE utf8mb4_bin NULL");
         }
     }
 } catch (Exception $e) {
