@@ -1240,18 +1240,38 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $stmt->bindValue(':code_product', $codeproduct);
     $stmt->execute();
     $product = $stmt->fetch(PDO::FETCH_ASSOC);
-    if ($user['Balance'] < $product['price_product']) {
-        $Balance_prim = $product['price_product'] - $user['Balance'];
+    
+    // بررسی وضعیت نمایندگی کاربر و محاسبه قیمت نهایی
+    $final_price = $product['price_product'];
+    $is_agent = false;
+    $discount_percent = 0;
+    
+    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+    if ($checkAgency && $checkAgency['status'] == 'approved') {
+        $is_agent = true;
+        $discount_percent = $checkAgency['discount_percent'];
+        // محاسبه قیمت با تخفیف برای نماینده
+        $final_price = $product['price_product'] - ($product['price_product'] * $discount_percent / 100);
+    }
+    
+    // بررسی موجودی کاربر با قیمت نهایی
+    if ($user['Balance'] < $final_price) {
+        $Balance_prim = $final_price - $user['Balance'];
         update("user", "Processing_value", $Balance_prim, "id", $from_id);
         sendmessage($from_id, $textbotlang['users']['sell']['None-credit'], $step_payment, 'HTML');
         sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
         step('get_step_payment', $from_id);
         return;
     }
+    
     $usernamepanel = $nameloc['username'];
-    $Balance_Low_user = $user['Balance'] - $product['price_product'];
+    
+    // کم کردن موجودی با قیمت نهایی (با تخفیف اگر نماینده باشد)
+    $Balance_Low_user = $user['Balance'] - $final_price;
     update("user", "Balance", $Balance_Low_user, "id", $from_id);
+    
     $ManagePanel->ResetUserDataUsage($nameloc['Service_location'], $user['Processing_value']);
+    
     if ($marzban_list_get['type'] == "marzban") {
         if(intval($product['Service_time']) == 0){
             $newDate = 0;
@@ -1309,23 +1329,6 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         ]
     ]);
     
-    // بررسی آیا کاربر نماینده است
-    $is_agent = false;
-    $discount_percent = 0;
-    $discounted_price = $product['price_product'];
-    
-    // چک کردن وجود کاربر در جدول نمایندگان
-    $stmt = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'active'");
-    $stmt->bindValue(':user_id', $from_id);
-    $stmt->execute();
-    $agency_data = $stmt->fetch(PDO::FETCH_ASSOC);
-    
-    if ($agency_data) {
-        $is_agent = true;
-        $discount_percent = $agency_data['discount_percent'];
-        $discounted_price = $product['price_product'] - ($product['price_product'] * ($discount_percent / 100));
-    }
-    
     // متن پیام تمدید موفق
     if ($is_agent) {
         // پیام برای نماینده با نمایش قیمت با تخفیف
@@ -1338,7 +1341,7 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
 💾 حجم: " . $product['Volume_constraint'] . " گیگابایت
 💰 قیمت اصلی: " . number_format($product['price_product']) . " تومان
 🎁 تخفیف نمایندگی: " . $discount_percent . " درصد
-💵 مبلغ پرداختی: " . number_format($discounted_price) . " تومان
+💵 مبلغ پرداختی: " . number_format($final_price) . " تومان
 
 " . $textbotlang['users']['extend']['thanks'];
     } else {
