@@ -127,6 +127,8 @@ $textbotlang['users']['stateus']['manageService'] = "⚙️ تنظیمات سر�
 $textbotlang['users']['stateus']['DecManageService '] = "⭕️ در این بخش می توانید سرویس خود را مدیریت کنید";
 $textbotlang['users']['stateus']['config'] ="🔰 کانفیگ دستی";
 $textbotlang['users']['stateus']['notconnected'] ="متصل نشده";
+$textbotlang['users']['stateus']['days'] = 'روز';
+$textbotlang['users']['stateus']['days_ago_expired'] = 'روز پیش منقضی شده';
 
 
 $textbotlang['users']['extend']['title'] ="📌 تمدید سرویس";

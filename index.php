@@ -668,15 +668,24 @@ if ($user['step'] == "getusernameinfo") {
     }
     #-------------[ status ]----------------#
     $status = $DataUserOut['status'];
-    $status_var = [
-        'active' => $textbotlang['users']['stateus']['active'],
-        'limited' => $textbotlang['users']['stateus']['limited'],
-        'disabled' => $textbotlang['users']['stateus']['disabled'],
-        'expired' => $textbotlang['users']['stateus']['expired'],
-        'on_hold' => $textbotlang['users']['stateus']['onhold']
-    ][$status];
+    if($DataUserOut['status'] == "active")
+    {
+        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
+    }
+    else{
+        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
+    }
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
+    $date = strtotime(date("Y-m-d H:i:s"));
+    $expiryTimestamp = strtotime($DataUserOut['expire']);
+    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
+    if ($remaining_days < 0) {
+        $past_days = abs($remaining_days);
+        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+    } else {
+        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
@@ -769,15 +778,24 @@ if (preg_match('/product_(\w+)/', $datain, $dataget)) {
     }
     #-------------status----------------#
     $status = $DataUserOut['status'];
-    $status_var = [
-        'active' => $textbotlang['users']['stateus']['active'],
-        'limited' => $textbotlang['users']['stateus']['limited'],
-        'disabled' => $textbotlang['users']['stateus']['disabled'],
-        'expired' => $textbotlang['users']['stateus']['expired'],
-        'on_hold' => $textbotlang['users']['stateus']['onhold']
-    ][$status];
+    if($DataUserOut['status'] == "active")
+    {
+        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
+    }
+    else{
+        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
+    }
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
+    $date = strtotime(date("Y-m-d H:i:s"));
+    $expiryTimestamp = strtotime($DataUserOut['expire']);
+    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
+    if ($remaining_days < 0) {
+        $past_days = abs($remaining_days);
+        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+    } else {
+        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
@@ -1362,15 +1380,24 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $DataUserOut = $ManagePanel->DataUser($marzban_list_get['name_panel'], $usernamepanel);
     #-------------status----------------#
     $status = $DataUserOut['status'];
-    $status_var = [
-        'active' => $textbotlang['users']['stateus']['active'],
-        'limited' => $textbotlang['users']['stateus']['limited'],
-        'disabled' => $textbotlang['users']['stateus']['disabled'],
-        'expired' => $textbotlang['users']['stateus']['expired'],
-        'on_hold' => $textbotlang['users']['stateus']['onhold']
-    ][$status];
+    if($DataUserOut['status'] == "active")
+    {
+        $status_var = "<b>{$textbotlang['users']['stateus']['active']}</b>";
+    }
+    else{
+        $status_var = "<b>{$textbotlang['users']['stateus']['disabled']}</b>";
+    }
     #--------------[ expire ]---------------#
     $expirationDate = $DataUserOut['expire'] ? jdate('Y/m/d', $DataUserOut['expire']) : $textbotlang['users']['stateus']['Unlimited'];
+    $date = strtotime(date("Y-m-d H:i:s"));
+    $expiryTimestamp = strtotime($DataUserOut['expire']);
+    $remaining_days = floor(($expiryTimestamp - $date) / 86400);
+    if ($remaining_days < 0) {
+        $past_days = abs($remaining_days);
+        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+    } else {
+        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+    }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
     #---------------[ RemainingVolume ]--------------#
