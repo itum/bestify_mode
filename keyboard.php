@@ -186,6 +186,16 @@ $step_payment['inline_keyboard'][] = [
     ['text' => $textbotlang['users']['closelist'] , 'callback_data' => "closelist" ]
 ];
 $step_payment = json_encode($step_payment);
+
+// کیبورد خطای پرداخت با دکمه بازگشت به لیست سرویس‌ها
+$payment_error_keyboard = json_encode([
+    'inline_keyboard' => [
+        [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
+        [['text' => "💳 کارت به کارت", 'callback_data' => "cart_to_offline"]],
+        [['text' => "🔙 بازگشت به لیست سرویس‌ها", 'callback_data' => "backorder"]]
+    ]
+]);
+
 $User_Services = json_encode([
     'keyboard' => [
         [['text' => "🛍 مشاهده سفارشات کاربر"]],

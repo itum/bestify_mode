@@ -1979,6 +1979,49 @@ if ($text == $datatextbot['text_account']) {
     $user_count_service = count(select("invoice", "*", "id_user", $from_id,"fetchAll"));
     $userinfo = select("user", "*", "id", $from_id, "select");
     $userbalance = number_format($userinfo['Balance'], 0);
+    
+    // آمار جدید
+    // تاریخ آخرین سفارش
+    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user ORDER BY id DESC LIMIT 1");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $last_order = $stmt->fetch(PDO::FETCH_ASSOC);
+    $last_order_date = ($last_order) ? jdate('Y/m/d', strtotime($last_order['date_buy'])) : '-';
+    
+    // تعداد سفارشات موفق
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE id_user = :id_user AND status IN ('active', 'expired')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $successful_orders = $stmt->fetchColumn();
+    
+    // تعداد اشتراک‌های دریافتی
+    $stmt = $pdo->prepare("SELECT COUNT(*) FROM invoice WHERE id_user = :id_user");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $total_subscriptions = $stmt->fetchColumn();
+    
+    // مجموع پرداختی
+    $stmt = $pdo->prepare("SELECT SUM(price) FROM invoice WHERE id_user = :id_user");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $total_payments = number_format($stmt->fetchColumn() ?: 0, 0);
+    
+    // مصرف کل ترافیک
+    $stmt = $pdo->prepare("SELECT SUM(volume_used) FROM invoice WHERE id_user = :id_user");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $total_traffic = formatBytes($stmt->fetchColumn() ?: 0);
+    
+    // تاریخ عضویت
+    $join_date = jdate('Y/m/d', strtotime($userinfo['date']));
+    
+    // پرتکرارترین سفارش
+    $stmt = $pdo->prepare("SELECT name_product, COUNT(*) as count FROM invoice WHERE id_user = :id_user GROUP BY name_product ORDER BY count DESC LIMIT 1");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $most_ordered = $stmt->fetch(PDO::FETCH_ASSOC);
+    $most_ordered_product = ($most_ordered) ? $most_ordered['name_product'] : '-';
+    
     $formatted_text = sprintf($textbotlang['users']['account'],
         $first_name,
         $from_id,
@@ -1987,6 +2030,16 @@ if ($text == $datatextbot['text_account']) {
         $userinfo['affiliatescount'],
         $datecc,
         $timecc);
+    
+    // افزودن آمار جدید به متن
+    $formatted_text .= "\n\n🌀 تاریخ آخرین سفارش :\n$last_order_date\n";
+    $formatted_text .= "\n🧢 میدونستی که تا الان  :";
+    $formatted_text .= "\n🗳️ $successful_orders سفارش موفق داشتی!";
+    $formatted_text .= "\n🔗 $total_subscriptions تا اشتراک دریافت کردی!";
+    $formatted_text .= "\n💲 $total_payments تومان پرداختی داشتی!";
+    $formatted_text .= "\n📊 $total_traffic مصرف کل ترافیک داشتی!";
+    $formatted_text .= "\n📅 از تاریخ $join_date عضو ربات شدی!";
+    $formatted_text .= "\n🔄 پر تکرار ترین سفارشت: $most_ordered_product";
     
     // افزودن دکمه تمدید خودکار به منوی مشخصات کاربری
     $keyboard_user_account = json_encode([
@@ -2298,7 +2351,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment_agency, 'HTML');
         } else {
-            sendmessage($from_id, $textin, $payment_agency, 'HTML');
+        sendmessage($from_id, $textin, $payment_agency, 'HTML');
         }
         step('payment', $from_id);
     } else {
@@ -2316,7 +2369,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment, 'HTML');
         } else {
-            sendmessage($from_id, $textin, $payment, 'HTML');
+        sendmessage($from_id, $textin, $payment, 'HTML');
         }
         step('payment', $from_id);
     }
