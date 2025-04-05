@@ -1276,8 +1276,20 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
         
-        sendmessage($from_id, $error_message, $step_payment, 'HTML');
-        sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
+        // ساخت کیبورد با دکمه بازگشت
+        $back_keyboard = json_encode([
+            'inline_keyboard' => [
+                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
+                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
+            ]
+        ]);
+        
+        // ویرایش پیام قبلی به جای ارسال پیام جدید
+        if (isset($message_id)) {
+            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
+        } else {
+            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
+        }
         step('get_step_payment', $from_id);
         return;
     }
@@ -1419,8 +1431,20 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $product_price . ", Shortage=" . $shortage);
         
-        sendmessage($from_id, $error_message, $step_payment, 'HTML');
-        sendmessage($from_id, $textbotlang['users']['sell']['selectpayment'], $backuser, 'HTML');
+        // ساخت کیبورد با دکمه بازگشت
+        $back_keyboard = json_encode([
+            'inline_keyboard' => [
+                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
+                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
+            ]
+        ]);
+        
+        // ویرایش پیام قبلی به جای ارسال پیام جدید
+        if (isset($message_id)) {
+            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
+        } else {
+            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
+        }
         step('get_step_payment', $from_id);
         return;
     }
@@ -1573,9 +1597,21 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         error_log("Debug error message: " . $error_message);
         error_log("Values: Balance=" . $user_balance . ", Price=" . $volume_price . ", Shortage=" . $shortage);
         
-        sendmessage($from_id, $error_message, $step_payment, 'HTML');
+        // ساخت کیبورد با دکمه بازگشت
+        $back_keyboard = json_encode([
+            'inline_keyboard' => [
+                [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
+                [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
+            ]
+        ]);
+        
+        // ویرایش پیام قبلی به جای ارسال پیام جدید
+        if (isset($message_id)) {
+            Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
+        } else {
+            sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
+        }
         step('get_step_payment', $from_id);
-        return;
     }
     
     // کم کردن موجودی با قیمت نهایی (با تخفیف اگر نماینده باشد)
@@ -2365,7 +2401,20 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             error_log("Debug error message: " . $error_message);
             error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
             
-            sendmessage($from_id, $error_message, $step_payment, 'HTML');
+            // ساخت کیبورد با دکمه بازگشت
+            $back_keyboard = json_encode([
+                'inline_keyboard' => [
+                    [['text' => "💰 شارژ کیف پول", 'callback_data' => "paypanel"]],
+                    [['text' => "🔙 بازگشت به صفحه قبل", 'callback_data' => "backuser"]]
+                ]
+            ]);
+            
+            // ویرایش پیام قبلی به جای ارسال پیام جدید
+            if (isset($message_id)) {
+                Editmessagetext($from_id, $message_id, $error_message, $back_keyboard, 'HTML');
+            } else {
+                sendmessage($from_id, $error_message, $back_keyboard, 'HTML');
+            }
             step('get_step_payment', $from_id);
             
             // ایجاد فاکتور پرداخت نشده
@@ -2472,10 +2521,6 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         
         // ثبت خطا در فایل لاگ برای بررسی
         error_log("Debug error message: " . $error_message);
-        error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
-        
-        sendmessage($from_id, $error_message, $step_payment, 'HTML');
-        step('get_step_payment', $from_id);
         $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time,Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)");
         $Status =  "unpaid";
         $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
