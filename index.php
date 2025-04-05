@@ -315,21 +315,99 @@ if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" |
     $page = 1;
     $items_per_page = 10;
     $start_index = ($page - 1) * $items_per_page;
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') ORDER BY username ASC LIMIT $start_index, $items_per_page");
+    
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها از مرزبان
+    $servicesData = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // محاسبه زمان باقیمانده
+                $days_left = 0;
+                if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                    $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                }
+                
+                // محاسبه حجم باقیمانده
+                $remaining_volume = 0;
+                $remaining_volume_text = $textbotlang['users']['unlimited'];
+                if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                    $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                    $remaining_volume_text = formatBytes($remaining_volume);
+                }
+                
+                // ذخیره اطلاعات برای مرتب‌سازی
+                $servicesData[] = array(
+                    'username' => $username,
+                    'display_name' => $service['display_name'],
+                    'days_left' => $days_left,
+                    'remaining_volume' => $remaining_volume,
+                    'remaining_volume_text' => $remaining_volume_text,
+                    'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                    'is_expired' => $days_left <= 0,
+                    'status' => $DataUserOut['status']
+                );
+            }
+        }
+    }
+    
+    // مرتب‌سازی سرویس‌ها: ابتدا سرویس‌های نزدیک به انقضا
+    usort($servicesData, function($a, $b) {
+        // اگر یکی منقضی شده و دیگری نه
+        if ($a['is_expired'] && !$b['is_expired']) return -1;
+        if (!$a['is_expired'] && $b['is_expired']) return 1;
+        
+        // هر دو منقضی شده‌اند یا هر دو فعال هستند - مرتب‌سازی بر اساس روزهای باقیمانده
+        return $a['days_left'] - $b['days_left'];
+    });
+    
+    // ساخت کیبورد با اطلاعات جدید
     $keyboardlists = [
         'inline_keyboard' => [],
     ];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
-        $keyboardlists['inline_keyboard'][] = [
-            [
-                'text' => "🌟" . $display_text . "🌟",
-                'callback_data' => "product_" . $row['username']
-            ],
+    
+    // تعداد سرویس‌ها برای نمایش در این صفحه
+    $page_services = array_slice($servicesData, $start_index, $items_per_page);
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($page_services as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
         ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($page_services) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
     }
+    
     $usernotlist = [
         [
             'text' => $textbotlang['Admin']['Status']['notusenameinbot'],
@@ -377,22 +455,107 @@ if ($datain == 'next_page') {
     } else {
         $next_page = $page + 1;
     }
-    $start_index = ($next_page - 1) * $items_per_page;
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') ORDER BY username ASC LIMIT $start_index, $items_per_page");
+    update("user", "pagenumber", $next_page, "id", $from_id);
+    
+    // تکرار همان کد بالا برای صفحه‌بندی
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها از مرزبان
+    $servicesData = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // محاسبه زمان باقیمانده
+                $days_left = 0;
+                if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                    $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                }
+                
+                // محاسبه حجم باقیمانده
+                $remaining_volume = 0;
+                $remaining_volume_text = $textbotlang['users']['unlimited'];
+                if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                    $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                    $remaining_volume_text = formatBytes($remaining_volume);
+                }
+                
+                // ذخیره اطلاعات برای مرتب‌سازی
+                $servicesData[] = array(
+                    'username' => $username,
+                    'display_name' => $service['display_name'],
+                    'days_left' => $days_left,
+                    'remaining_volume' => $remaining_volume,
+                    'remaining_volume_text' => $remaining_volume_text,
+                    'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                    'is_expired' => $days_left <= 0,
+                    'status' => $DataUserOut['status']
+                );
+            }
+        }
+    }
+    
+    // مرتب‌سازی سرویس‌ها: ابتدا سرویس‌های نزدیک به انقضا
+    usort($servicesData, function($a, $b) {
+        // اگر یکی منقضی شده و دیگری نه
+        if ($a['is_expired'] && !$b['is_expired']) return -1;
+        if (!$a['is_expired'] && $b['is_expired']) return 1;
+        
+        // هر دو منقضی شده‌اند یا هر دو فعال هستند - مرتب‌سازی بر اساس روزهای باقیمانده
+        return $a['days_left'] - $b['days_left'];
+    });
+    
+    // ساخت کیبورد با اطلاعات جدید
     $keyboardlists = [
         'inline_keyboard' => [],
     ];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
-        $keyboardlists['inline_keyboard'][] = [
-            [
-                'text' => "🌟️" . $display_text . "🌟️",
-                'callback_data' => "product_" . $row['username']
-            ],
+    
+    // تعداد سرویس‌ها برای نمایش در این صفحه
+    $start_index = ($next_page - 1) * $items_per_page;
+    $page_services = array_slice($servicesData, $start_index, $items_per_page);
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($page_services as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
         ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($page_services) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
     }
+    
+    $usernotlist = [
+        [
+            'text' => $textbotlang['Admin']['Status']['notusenameinbot'],
+            'callback_data' => 'usernotlist'
+        ]
+    ];
     $pagination_buttons = [
         [
             'text' => $textbotlang['users']['page']['next'],
@@ -403,20 +566,14 @@ if ($datain == 'next_page') {
             'callback_data' => 'previous_page'
         ]
     ];
-    $usernotlist = [
-        [
-            'text' => $textbotlang['Admin']['Status']['notusenameinbot'],
-            'callback_data' => 'usernotlist'
-        ]
-    ];
+    
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
     $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
     $keyboard_json = json_encode($keyboardlists);
-    update("user", "pagenumber", $next_page, "id", $from_id);
-    Editmessagetext($from_id, $message_id, $text_callback, $keyboard_json);
+    Editmessagetext($from_id, $message_id, $textbotlang['users']['sell']['service_sell'], $keyboard_json);
 } elseif ($datain == 'previous_page') {
     $page = $user['pagenumber'];
     $items_per_page = 10;
@@ -425,22 +582,107 @@ if ($datain == 'next_page') {
     } else {
         $next_page = $page - 1;
     }
-    $start_index = ($next_page - 1) * $items_per_page;
-    $stmt = $pdo->prepare("SELECT * FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time'  OR status = 'end_of_volume' OR status = 'sendedwarn') ORDER BY username ASC LIMIT $start_index, $items_per_page");
+    update("user", "pagenumber", $next_page, "id", $from_id);
+    
+    // تکرار همان کد بالا برای صفحه‌بندی
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
     $stmt->bindParam(':id_user', $from_id);
     $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها از مرزبان
+    $servicesData = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // محاسبه زمان باقیمانده
+                $days_left = 0;
+                if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                    $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                }
+                
+                // محاسبه حجم باقیمانده
+                $remaining_volume = 0;
+                $remaining_volume_text = $textbotlang['users']['unlimited'];
+                if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                    $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                    $remaining_volume_text = formatBytes($remaining_volume);
+                }
+                
+                // ذخیره اطلاعات برای مرتب‌سازی
+                $servicesData[] = array(
+                    'username' => $username,
+                    'display_name' => $service['display_name'],
+                    'days_left' => $days_left,
+                    'remaining_volume' => $remaining_volume,
+                    'remaining_volume_text' => $remaining_volume_text,
+                    'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                    'is_expired' => $days_left <= 0,
+                    'status' => $DataUserOut['status']
+                );
+            }
+        }
+    }
+    
+    // مرتب‌سازی سرویس‌ها: ابتدا سرویس‌های نزدیک به انقضا
+    usort($servicesData, function($a, $b) {
+        // اگر یکی منقضی شده و دیگری نه
+        if ($a['is_expired'] && !$b['is_expired']) return -1;
+        if (!$a['is_expired'] && $b['is_expired']) return 1;
+        
+        // هر دو منقضی شده‌اند یا هر دو فعال هستند - مرتب‌سازی بر اساس روزهای باقیمانده
+        return $a['days_left'] - $b['days_left'];
+    });
+    
+    // ساخت کیبورد با اطلاعات جدید
     $keyboardlists = [
         'inline_keyboard' => [],
     ];
-    while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
-        $display_text = $row['display_name'] ? $row['display_name'] : $row['username'];
-        $keyboardlists['inline_keyboard'][] = [
-            [
-                'text' => "🌟️" . $display_text . "🌟️",
-                'callback_data' => "product_" . $row['username']
-            ],
+    
+    // تعداد سرویس‌ها برای نمایش در این صفحه
+    $start_index = ($next_page - 1) * $items_per_page;
+    $page_services = array_slice($servicesData, $start_index, $items_per_page);
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($page_services as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
         ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($page_services) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
     }
+    
+    $usernotlist = [
+        [
+            'text' => $textbotlang['Admin']['Status']['notusenameinbot'],
+            'callback_data' => 'usernotlist'
+        ]
+    ];
     $pagination_buttons = [
         [
             'text' => $textbotlang['users']['page']['next'],
@@ -451,20 +693,14 @@ if ($datain == 'next_page') {
             'callback_data' => 'previous_page'
         ]
     ];
-    $usernotlist = [
-        [
-            'text' => $textbotlang['Admin']['Status']['notusenameinbot'],
-            'callback_data' => 'usernotlist'
-        ]
-    ];
+    
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
     $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
     $keyboard_json = json_encode($keyboardlists);
-    update("user", "pagenumber", $next_page, "id", $from_id);
-    Editmessagetext($from_id, $message_id, $text_callback, $keyboard_json);
+    Editmessagetext($from_id, $message_id, $textbotlang['users']['sell']['service_sell'], $keyboard_json);
 }
 if ($datain == "usernotlist") {
     sendmessage($from_id, $textbotlang['users']['stateus']['SendUsername'], $backuser, 'html');
