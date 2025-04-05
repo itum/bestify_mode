@@ -681,10 +681,10 @@ if ($user['step'] == "getusernameinfo") {
     $expiryTimestamp = strtotime($DataUserOut['expire']);
     $remaining_days = floor(($expiryTimestamp - $date) / 86400);
     if ($remaining_days < 0) {
-        $past_days = abs($remaining_days);
-        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+        $abs_remaining_days = abs($remaining_days);
+        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
     } else {
-        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+        $day = $remaining_days . "روز";
     }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
@@ -791,10 +791,10 @@ if (preg_match('/product_(\w+)/', $datain, $dataget)) {
     $expiryTimestamp = strtotime($DataUserOut['expire']);
     $remaining_days = floor(($expiryTimestamp - $date) / 86400);
     if ($remaining_days < 0) {
-        $past_days = abs($remaining_days);
-        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+        $abs_remaining_days = abs($remaining_days);
+        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
     } else {
-        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+        $day = $remaining_days . "روز";
     }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
@@ -1393,10 +1393,10 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $expiryTimestamp = strtotime($DataUserOut['expire']);
     $remaining_days = floor(($expiryTimestamp - $date) / 86400);
     if ($remaining_days < 0) {
-        $past_days = abs($remaining_days);
-        $day = "{$past_days} {$textbotlang['users']['stateus']['days_ago_expired']} 🥺";
+        $abs_remaining_days = abs($remaining_days);
+        $day = $abs_remaining_days . "روز پیش منقضی شده 🥺";
     } else {
-        $day = "{$remaining_days} {$textbotlang['users']['stateus']['days']}";
+        $day = $remaining_days . "روز";
     }
     #-------------[ data_limit ]----------------#
     $LastTraffic = $DataUserOut['data_limit'] ? formatBytes($DataUserOut['data_limit']) : $textbotlang['users']['stateus']['Unlimited'];
