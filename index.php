@@ -1363,13 +1363,28 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     deletemessage($from_id, $message_id);
     $id_product = $dataget[1];
     $product = select("product", "*", "code_product", $id_product, "select");
-    if ($user['Balance'] < $product['price_product']) {
-        $Balance_prim = $product['price_product'] - $user['Balance'];
+    
+    // بررسی وضعیت نمایندگی کاربر و محاسبه قیمت نهایی
+    $final_price = $product['price_product'];
+    $is_agent = false;
+    $discount_percent = 0;
+    
+    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+    if ($checkAgency && $checkAgency['status'] == 'approved') {
+        $is_agent = true;
+        $discount_percent = $checkAgency['discount_percent'];
+        // محاسبه قیمت با تخفیف برای نماینده
+        $final_price = $product['price_product'] - ($product['price_product'] * $discount_percent / 100);
+    }
+    
+    // بررسی موجودی کاربر با قیمت نهایی
+    if ($user['Balance'] < $final_price) {
+        $Balance_prim = $final_price - $user['Balance'];
         update("user", "Processing_value", $Balance_prim, "id", $from_id);
         
         // فرمت کردن مقادیر برای نمایش
         $user_balance = number_format($user['Balance']);
-        $product_price = number_format($product['price_product']);
+        $product_price = number_format($final_price);
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
@@ -1381,7 +1396,9 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         return;
     }
     $usernamepanel = $nameloc['username'];
-    $Balance_Low_user = $user['Balance'] - $product['price_product'];
+    
+    // کم کردن موجودی با قیمت نهایی (با تخفیف اگر نماینده باشد)
+    $Balance_Low_user = $user['Balance'] - $final_price;
     update("user", "Balance", $Balance_Low_user, "id", $from_id);
     $ManagePanel->ResetUserDataUsage($nameloc['Service_location'], $user['Processing_value']);
     if ($marzban_list_get['type'] == "marzban") {
@@ -1489,13 +1506,28 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $volume = $dataget[1];
     Editmessagetext($from_id, $message_id, $text_callback, json_encode(['inline_keyboard' => []]));
     $nameloc = select("invoice", "*", "username", $user['Processing_value'], "select");
-    if ($user['Balance'] < $volume) {
-        $Balance_prim = $volume - $user['Balance'];
+    
+    // بررسی وضعیت نمایندگی کاربر و محاسبه قیمت نهایی
+    $final_price = $volume;
+    $is_agent = false;
+    $discount_percent = 0;
+    
+    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+    if ($checkAgency && $checkAgency['status'] == 'approved') {
+        $is_agent = true;
+        $discount_percent = $checkAgency['discount_percent'];
+        // محاسبه قیمت با تخفیف برای نماینده
+        $final_price = $volume - ($volume * $discount_percent / 100);
+    }
+    
+    // بررسی موجودی کاربر با قیمت نهایی
+    if ($user['Balance'] < $final_price) {
+        $Balance_prim = $final_price - $user['Balance'];
         update("user", "Processing_value", $Balance_prim, "id", $from_id);
         
         // فرمت کردن مقادیر برای نمایش
         $user_balance = number_format($user['Balance']);
-        $volume_price = number_format($volume);
+        $volume_price = number_format($final_price);
         $shortage = number_format($Balance_prim);
         
         // ایجاد پیام خطا با مقادیر مورد نیاز
@@ -1505,7 +1537,9 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
         step('get_step_payment', $from_id);
         return;
     }
-    $Balance_Low_user = $user['Balance'] - $volume;
+    
+    // کم کردن موجودی با قیمت نهایی (با تخفیف اگر نماینده باشد)
+    $Balance_Low_user = $user['Balance'] - $final_price;
     update("user", "Balance", $Balance_Low_user, "id", $from_id);
     $marzban_list_get = select("marzban_panel", "*", "name_panel", $nameloc['Service_location'], "select");
     $DataUserOut = $ManagePanel->DataUser($marzban_list_get['name_panel'], $user['Processing_value']);
