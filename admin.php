@@ -46,6 +46,7 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
     $setting = select("setting", "*");
     $status = ($setting['double_charge_status'] == 'on') ? '✅ فعال' : '❌ غیرفعال';
     $min_purchase = $setting['double_charge_min_purchase'];
+    $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
     
     $purchase_guide = "";
     if ($min_purchase == 0) {
@@ -58,6 +59,7 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
 
 ▫️ وضعیت فعلی: $status
 ▫️ حداقل تعداد خرید لازم: $purchase_guide
+▫️ مهلت استفاده: $expire_hours ساعت
 ▫️ توضیحات: با این قابلیت، کاربرانی که به حد نصاب خرید رسیده باشند می‌توانند یکبار از امکان شارژ دوبرابر استفاده کنند.
 ▫️ کاربران نماینده مشمول این طرح نمی‌شوند.
 ▫️ راهنما: برای تغییر حداقل تعداد خرید مورد نیاز، از دکمه زیر استفاده کنید. اگر مقدار 0 را وارد کنید، تمامی کاربران بدون محدودیت می‌توانند از این ویژگی استفاده کنند.";
@@ -65,7 +67,8 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
     $double_charge_keyboard = json_encode([
         'keyboard' => [
             [['text' => "✅ فعال کردن شارژ دوبرابر"], ['text' => "❌ غیرفعال کردن شارژ دوبرابر"]],
-            [['text' => "🔢 تنظیم حداقل تعداد خرید"]],
+            [['text' => "🔢 تنظیم حداقل تعداد خرید"], ['text' => "⏱ تنظیم مهلت استفاده"]],
+            [['text' => "📋 لیست کاربران مشمول شارژ دوبرابر"]],
             [['text' => $textbotlang['Admin']['Back-Adminment']]]
         ],
         'resize_keyboard' => true
@@ -82,34 +85,26 @@ elseif ($text == "❌ غیرفعال کردن شارژ دوبرابر") {
     sendmessage($from_id, "❌ ویژگی شارژ دوبرابر با موفقیت غیرفعال شد.", $setting_panel, 'HTML');
 }
 elseif ($text == "🔢 تنظیم حداقل تعداد خرید") {
-    $setting = select("setting", "*");
-    $min_purchase = $setting['double_charge_min_purchase'];
-    
-    $text = "⚙️ تنظیم حداقل تعداد خرید برای شارژ دوبرابر
-
-🔹 مقدار فعلی: $min_purchase
-🔸 راهنما: لطفاً عدد موردنظر را وارد کنید. این عدد حداقل تعداد خریدی است که کاربر باید داشته باشد تا بتواند از ویژگی شارژ دوبرابر استفاده کند.
-🔸 اگر مقدار 0 را وارد کنید، تمامی کاربران بدون محدودیت خرید می‌توانند از این ویژگی استفاده کنند.";
-    
-    sendmessage($from_id, $text, $backadmin, 'HTML');
+    sendmessage($from_id, "🔢 لطفاً حداقل تعداد خرید لازم برای احراز شرایط شارژ دوبرابر را وارد کنید.\n\n👈 اگر می‌خواهید همه کاربران بدون محدودیت مشمول شوند، عدد 0 را وارد کنید.", $backuser, 'HTML');
     step('set_double_charge_min_purchase', $from_id);
 }
 elseif ($user['step'] == "set_double_charge_min_purchase") {
-    if (!is_numeric($text) || $text < 0) {
-        sendmessage($from_id, "❌ لطفاً یک عدد صحیح مثبت یا صفر وارد کنید.", null, 'HTML');
+    // بررسی ورودی عددی
+    if (!is_numeric($text) || intval($text) < 0) {
+        sendmessage($from_id, "❌ لطفاً یک عدد صحیح بزرگتر یا مساوی صفر وارد کنید.", null, 'HTML');
         return;
     }
     
-    update("setting", "double_charge_min_purchase", $text);
+    $min_purchase = intval($text);
+    update("setting", "double_charge_min_purchase", $min_purchase);
     
-    if ($text == 0) {
-        $message = "✅ حداقل تعداد خرید برای شارژ دوبرابر به $text تغییر یافت. اکنون تمامی کاربران بدون محدودیت می‌توانند از این ویژگی استفاده کنند.";
-    } else {
-        $message = "✅ حداقل تعداد خرید برای شارژ دوبرابر به $text تغییر یافت.";
+    $message = "✅ حداقل تعداد خرید لازم برای شارژ دوبرابر با موفقیت به $min_purchase تغییر یافت.";
+    if ($min_purchase == 0) {
+        $message .= "\n\n👈 حالا تمام کاربران (به جز نمایندگان) می‌توانند از شارژ دوبرابر استفاده کنند.";
     }
     
-    sendmessage($from_id, $message, $setting_panel, 'HTML');
-    step('home', $from_id);
+    sendmessage($from_id, $message, $double_charge_keyboard, 'HTML');
+    step('none', $from_id);
 }
 if ($text == $textbotlang['Admin']['Addedadmin']) {
     sendmessage($from_id, $textbotlang['Admin']['manageadmin']['getid'], $backadmin, 'HTML');
@@ -3074,4 +3069,223 @@ if ($user['step'] == "edit_agency_discount") {
 
 if ($text == $textbotlang['Admin']['keyboardadmin']['settings']) {
     sendmessage($from_id, $textbotlang['users']['selectoption'], $setting_panel, 'HTML');
+}
+
+// اضافه کردن کد جدید برای لیست کاربران مشمول شارژ دوبرابر
+elseif ($text == "📋 لیست کاربران مشمول شارژ دوبرابر") {
+    $setting = select("setting", "*");
+    $min_purchase = intval($setting['double_charge_min_purchase']);
+    
+    // شرط بررسی فعال بودن ویژگی
+    if ($setting['double_charge_status'] != 'on') {
+        sendmessage($from_id, "❌ ویژگی شارژ دوبرابر در حال حاضر غیرفعال است. ابتدا آن را فعال کنید.", $double_charge_keyboard, 'HTML');
+        return;
+    }
+    
+    try {
+        // بررسی کاربرانی که مشمول شارژ دوبرابر می‌شوند
+        $eligible_users = [];
+        $total_eligible = 0;
+        
+        // کوئری برای یافتن تمام کاربران
+        $users_query = $pdo->query("SELECT * FROM user WHERE User_Status = 'Active'");
+        $users = $users_query->fetchAll(PDO::FETCH_ASSOC);
+        
+        foreach ($users as $user) {
+            $user_id = $user['id'];
+            
+            // بررسی اینکه کاربر نماینده نباشد
+            $agency_user = false;
+            $check_agency_table = $pdo->query("SHOW TABLES LIKE 'agency'");
+            if ($check_agency_table && $check_agency_table->rowCount() > 0) {
+                $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
+                $stmt_agency->bindParam(':user_id', $user_id);
+                $stmt_agency->execute();
+                $agency_user = $stmt_agency->rowCount() > 0;
+            }
+            
+            if (!$agency_user) {
+                // بررسی تعداد خرید کاربر
+                $meets_purchase_requirement = ($min_purchase == 0); // اگر min_purchase صفر باشد، نیازی به بررسی تعداد خرید نیست
+                
+                if (!$meets_purchase_requirement) {
+                    // بررسی اینکه کاربر به حداقل تعداد خرید رسیده باشد
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+                    $stmt->bindParam(':user_id', $user_id);
+                    $stmt->execute();
+                    $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                    
+                    $meets_purchase_requirement = ($purchase_count >= $min_purchase);
+                }
+                
+                if ($meets_purchase_requirement) {
+                    // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
+                    $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
+                    if ($check_table && $check_table->rowCount() > 0) {
+                        $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                        $stmt->bindParam(':user_id', $user_id);
+                        $stmt->execute();
+                        
+                        if ($stmt->rowCount() == 0) {
+                            // اضافه کردن کاربر به لیست
+                            $user_info = [
+                                'id' => $user_id,
+                                'username' => !empty($user['username']) ? $user['username'] : 'بدون نام کاربری'
+                            ];
+                            $eligible_users[] = $user_info;
+                            $total_eligible++;
+                        }
+                    }
+                }
+            }
+        }
+        
+        // ارسال نتایج به ادمین
+        if ($total_eligible > 0) {
+            $list_text = "📋 لیست کاربران مشمول شارژ دوبرابر:\n\n";
+            $list_text .= "🔹 تعداد کل: $total_eligible کاربر\n\n";
+            
+            $counter = 1;
+            foreach ($eligible_users as $user) {
+                $list_text .= "$counter. شناسه: {$user['id']} | نام: {$user['username']}\n";
+                $counter++;
+                
+                // ارسال پیام به صورت بخش‌بندی شده برای جلوگیری از خطای پیام طولانی
+                if ($counter % 20 == 0 || $counter > $total_eligible) {
+                    sendmessage($from_id, $list_text, null, 'HTML');
+                    $list_text = "";
+                }
+            }
+            
+            if (!empty($list_text)) {
+                sendmessage($from_id, $list_text, null, 'HTML');
+            }
+            
+            // منوی اطلاع‌رسانی به کاربران
+            $notify_keyboard = json_encode([
+                'keyboard' => [
+                    [['text' => "📢 اطلاع‌رسانی به کاربران مشمول"]],
+                    [['text' => $textbotlang['Admin']['Back-Adminment']]]
+                ],
+                'resize_keyboard' => true
+            ]);
+            
+            sendmessage($from_id, "آیا می‌خواهید به کاربران مشمول اطلاع‌رسانی کنید؟", $notify_keyboard, 'HTML');
+            step('notify_double_charge_users', $from_id);
+            
+            // ذخیره لیست کاربران در متغیر سشن
+            $_SESSION['eligible_users'] = $eligible_users;
+        } else {
+            sendmessage($from_id, "❌ هیچ کاربری واجد شرایط شارژ دوبرابر نیست.", $double_charge_keyboard, 'HTML');
+        }
+    } catch (PDOException $e) {
+        sendmessage($from_id, "خطا در بررسی کاربران: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+    }
+}
+
+// رسیدگی به مرحله اطلاع‌رسانی
+elseif ($user['step'] == "notify_double_charge_users") {
+    if ($text == "📢 اطلاع‌رسانی به کاربران مشمول") {
+        if (isset($_SESSION['eligible_users']) && count($_SESSION['eligible_users']) > 0) {
+            $count = 0;
+            $success = 0;
+            
+            // دریافت مهلت استفاده از تنظیمات
+            $setting = select("setting", "*");
+            $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
+            
+            // محاسبه تاریخ و زمان انقضا
+            $now = time();
+            $expire_timestamp = $now + ($expire_hours * 3600);
+            $expire_date = jdate("Y/m/d", $expire_timestamp);
+            $expire_time = jdate("H:i", $expire_timestamp);
+            
+            foreach ($_SESSION['eligible_users'] as $user_info) {
+                $count++;
+                $user_id = $user_info['id'];
+                $username = $user_info['username'];
+                
+                // پیام اطلاع‌رسانی با مهلت استفاده
+                $notification_message = "🎉 خبر خوب {$username} عزیز!
+
+💰 شما واجد شرایط استفاده از طرح ویژه شارژ دوبرابر هستید!
+
+با استفاده از این فرصت استثنایی، می‌توانید یک‌بار حساب خود را با هر مبلغی شارژ کنید و دو برابر آن را دریافت نمایید!
+
+مثال: اگر 200 هزار تومان شارژ کنید، 400 هزار تومان به حساب شما افزوده می‌شود!
+
+⏱ مهلت استفاده: $expire_hours ساعت (تا تاریخ $expire_date ساعت $expire_time)
+
+🔴 نکته مهم: این فرصت فقط یک‌بار قابل استفاده است، پس حتماً از آن به بهترین شکل بهره‌مند شوید.
+
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
+
+🚀 موفق باشید!";
+                
+                // ارسال پیام به کاربر
+                $result = telegram('sendMessage', [
+                    'chat_id' => $user_id,
+                    'text' => $notification_message,
+                    'parse_mode' => 'HTML'
+                ]);
+                
+                if (isset($result['ok']) && $result['ok']) {
+                    $success++;
+                }
+                
+                // کمی صبر برای جلوگیری از محدودیت تلگرام
+                sleep(1);
+            }
+            
+            sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success), $double_charge_keyboard, 'HTML');
+            step('none', $from_id);
+            
+            // پاک کردن سشن
+            unset($_SESSION['eligible_users']);
+        } else {
+            sendmessage($from_id, "❌ لیست کاربران مشمول در دسترس نیست. لطفاً دوباره لیست را بررسی کنید.", $double_charge_keyboard, 'HTML');
+            step('none', $from_id);
+        }
+    } else {
+        sendmessage($from_id, "به منوی مدیریت بازگشتید.", $keyboard, 'HTML');
+        step('none', $from_id);
+    }
+}
+
+// اضافه کردن کد تنظیم مهلت استفاده
+elseif ($text == "⏱ تنظیم مهلت استفاده") {
+    $setting = select("setting", "*");
+    $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
+    
+    sendmessage($from_id, "⏱ تنظیم مهلت استفاده از شارژ دوبرابر\n\n🔹 مقدار فعلی: $expire_hours ساعت\n\n👈 لطفاً مدت زمان اعتبار پیشنهاد شارژ دوبرابر را به ساعت وارد کنید:", $backuser, 'HTML');
+    step('set_double_charge_expire_hours', $from_id);
+}
+
+// رسیدگی به مرحله تنظیم مهلت استفاده
+elseif ($user['step'] == "set_double_charge_expire_hours") {
+    // بررسی ورودی عددی
+    if (!is_numeric($text) || intval($text) <= 0) {
+        sendmessage($from_id, "❌ لطفاً یک عدد صحیح بزرگتر از صفر وارد کنید.", null, 'HTML');
+        return;
+    }
+    
+    $expire_hours = intval($text);
+    
+    // اضافه کردن فیلد به جدول اگر وجود نداشته باشد
+    try {
+        $stmt = $pdo->prepare("SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'setting' AND column_name = 'double_charge_expire_hours'");
+        $stmt->execute();
+        if ($stmt->rowCount() == 0) {
+            // فیلد وجود ندارد، آن را اضافه می‌کنیم
+            $stmt = $pdo->prepare("ALTER TABLE setting ADD COLUMN double_charge_expire_hours INT(11) DEFAULT 72");
+            $stmt->execute();
+        }
+    } catch (PDOException $e) {
+        error_log("خطا در بررسی یا ایجاد فیلد double_charge_expire_hours: " . $e->getMessage());
+    }
+    
+    update("setting", "double_charge_expire_hours", $expire_hours);
+    
+    sendmessage($from_id, "✅ مهلت استفاده از شارژ دوبرابر با موفقیت به $expire_hours ساعت تغییر یافت.", $double_charge_keyboard, 'HTML');
+    step('none', $from_id);
 }
