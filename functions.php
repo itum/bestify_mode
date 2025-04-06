@@ -390,36 +390,66 @@ function DirectPayment($order_id){
     }else {
         // بررسی امکان شارژ دوبرابر
         $double_charge = false;
+        $setting = select("setting", "*");
         
-        // بررسی فعال بودن ویژگی شارژ دوبرابر
-        if($setting['double_charge_status'] == 'on') {
-            // بررسی اینکه کاربر نماینده نباشد
-            $agency_user = select("agency", "*", "user_id", $Payment_report['id_user'], "select");
-            
-            if(!$agency_user) {
-                // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
-                $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-                $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                $stmt->execute();
-                $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+        try {
+            // بررسی فعال بودن ویژگی شارژ دوبرابر
+            if(isset($setting['double_charge_status']) && $setting['double_charge_status'] == 'on') {
+                // بررسی اینکه کاربر نماینده نباشد
+                $agency_exists = $pdo->prepare("SHOW TABLES LIKE 'agency'");
+                $agency_exists->execute();
+                $agency_user = false;
                 
-                if($purchase_count >= 3) {
-                    // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
-                    $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                if ($agency_exists->rowCount() > 0) {
+                    $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
+                    $stmt_agency->bindParam(':user_id', $Payment_report['id_user']);
+                    $stmt_agency->execute();
+                    $agency_user = $stmt_agency->rowCount() > 0;
+                }
+                
+                if(!$agency_user) {
+                    // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
                     $stmt->bindParam(':user_id', $Payment_report['id_user']);
                     $stmt->execute();
+                    $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
                     
-                    if($stmt->rowCount() == 0) {
-                        // کاربر واجد شرایط شارژ دوبرابر است
-                        $double_charge = true;
+                    if($purchase_count >= 3) {
+                        // بررسی وجود جدول double_charge_users
+                        $table_exists = $pdo->prepare("SHOW TABLES LIKE 'double_charge_users'");
+                        $table_exists->execute();
                         
-                        // ثبت استفاده کاربر از ویژگی شارژ دوبرابر
-                        $stmt = $pdo->prepare("INSERT INTO double_charge_users (user_id) VALUES (:user_id)");
+                        if ($table_exists->rowCount() == 0) {
+                            // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                            $create_table = "CREATE TABLE IF NOT EXISTS double_charge_users (
+                                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                user_id varchar(500) NOT NULL,
+                                used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin";
+                            $pdo->exec($create_table);
+                        }
+                        
+                        // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
+                        $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
                         $stmt->bindParam(':user_id', $Payment_report['id_user']);
                         $stmt->execute();
+                        
+                        if($stmt->rowCount() == 0) {
+                            // کاربر واجد شرایط شارژ دوبرابر است
+                            $double_charge = true;
+                            
+                            // ثبت استفاده کاربر از ویژگی شارژ دوبرابر
+                            $stmt = $pdo->prepare("INSERT INTO double_charge_users (user_id) VALUES (:user_id)");
+                            $stmt->bindParam(':user_id', $Payment_report['id_user']);
+                            $stmt->execute();
+                        }
                     }
                 }
             }
+        } catch (PDOException $e) {
+            // در صورت خطا، لاگ می‌کنیم اما ادامه می‌دهیم تا پرداخت معمولی انجام شود
+            error_log("خطا در بررسی شرایط شارژ دوبرابر: " . $e->getMessage());
+            $double_charge = false;
         }
         
         // محاسبه مبلغ شارژ (عادی یا دوبرابر)
