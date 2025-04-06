@@ -1846,17 +1846,7 @@ if ($user['step'] == "createusertest" || preg_match('/locationtests_(.*)/', $dat
             ]
         ]
     ]);
-    
-    // بررسی اگر کاربر نماینده است
-    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
-    if ($checkAgency && $checkAgency['status'] == 'approved') {
-        // استفاده از متن مخصوص نمایندگان بدون نمایش قیمت
-        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice-agent'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
-    } else {
-        // استفاده از متن معمولی برای کاربران عادی
-        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
-    }
-    
+    $textcreatuser = sprintf($textbotlang['users']['buy']['createservicetest'],$username_ac,$marzban_list_get['name_panel'],$setting['time_usertest'],$setting['val_usertest'],$output_config_link,$text_config);
     if ($marzban_list_get['sublink'] == "onsublink") {
         $urlimage = "$from_id$randomString.png";
         $writer = new PngWriter();
@@ -2616,17 +2606,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             ]
         ]
     ]);
-    
-    // بررسی اگر کاربر نماینده است
-    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
-    if ($checkAgency && $checkAgency['status'] == 'approved') {
-        // استفاده از متن مخصوص نمایندگان بدون نمایش قیمت
-        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice-agent'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
-    } else {
-        // استفاده از متن معمولی برای کاربران عادی
-        $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
-    }
-    
+    $textcreatuser = sprintf($textbotlang['users']['buy']['createservice'],$username_ac,$info_product['name_product'],$marzban_list_get['name_panel'],$info_product['Service_time'],$info_product['Volume_constraint'],$text_config,$link_config);
     if ($marzban_list_get['sublink'] == "onsublink") {
         $urlimage = "$from_id$randomString.png";
         $writer = new PngWriter();
@@ -3980,4 +3960,98 @@ elseif ($user['step'] == "search_date") {
 // پردازش نام نمایشی
 if (preg_match('/display_name_(\w+)/', $datain, $dataget)) {
 // ... existing code ...
+} elseif ($data == "paypanel") {
+    // پیام مربوط به افزایش موجودی
+    $payment_message = "💳 لطفاً مبلغ مورد نظر برای شارژ کیف پول را انتخاب کنید:
+
+⚠️ برای وارد کردن مبلغ دلخواه از دکمه «مبلغ دلخواه» استفاده کنید.
+⚠️ مبلغ دلخواه باید بین 20 هزار تا 10 میلیون تومان باشد.
+⚠️ لطفا توجه داشته باشید که مبلغ را فقط با اعداد انگلیسی وارد کنید.";
+
+    // ایجاد کیبورد با مبالغ پیشنهادی
+    $keyboard = [
+        'inline_keyboard' => [
+            [
+                ['text' => "💰 20,000 تومان", 'callback_data' => "increase_balance_20000"],
+                ['text' => "💰 50,000 تومان", 'callback_data' => "increase_balance_50000"]
+            ],
+            [
+                ['text' => "💰 100,000 تومان", 'callback_data' => "increase_balance_100000"],
+                ['text' => "💰 200,000 تومان", 'callback_data' => "increase_balance_200000"]
+            ],
+            [
+                ['text' => "💰 500,000 تومان", 'callback_data' => "increase_balance_500000"],
+                ['text' => "💰 1,000,000 تومان", 'callback_data' => "increase_balance_1000000"]
+            ],
+            [
+                ['text' => "💰 مبلغ دلخواه", 'callback_data' => "custom_balance"]
+            ],
+            [
+                ['text' => "🔙 بازگشت به منوی اصلی", 'callback_data' => "backuser"]
+            ]
+        ]
+    ];
+
+    // ارسال یا ویرایش پیام با کیبورد جدید
+    Editmessagetext($from_id, $message_id, $payment_message, json_encode($keyboard), 'HTML');
+    
+} elseif (preg_match('/^increase_balance_(\d+)$/', $data, $matches)) {
+    // دریافت مبلغ انتخاب شده
+    $amount = $matches[1];
+    
+    // ذخیره مبلغ برای پردازش
+    update("user", "Processing_value", $amount, "id", $from_id);
+    
+    // نمایش روش‌های پرداخت
+    $payment_methods = getpaymentmethod();
+    if ($payment_methods != false) {
+        $text_payment = "💳 لطفا روش پرداخت خود را انتخاب کنید:
+مبلغ: " . number_format($amount) . " تومان";
+        Editmessagetext($from_id, $message_id, $text_payment, $payment_methods, 'HTML');
+        step('get_step_payment', $from_id);
+    }
+    
+} elseif ($data == "custom_balance") {
+    // پیام درخواست مبلغ دلخواه
+    $message_text = "💲 لطفا مبلغ دلخواه خود را به تومان وارد کنید:
+
+⚠️ مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.
+⚠️ لطفا فقط از اعداد انگلیسی (0-9) استفاده کنید.
+⚠️ بدون هیچ کاراکتر اضافی مانند ویرگول، نقطه یا فاصله.";
+
+    Editmessagetext($from_id, $message_id, $message_text, json_encode([
+        'inline_keyboard' => [
+            [['text' => "🔙 بازگشت", 'callback_data' => "paypanel"]]
+        ]
+    ]), 'HTML');
+    step('custom_payment_amount', $from_id);
+    
+} elseif ($user['step'] == "custom_payment_amount") {
+    // بررسی صحت مبلغ وارد شده
+    if (!preg_match('/^[0-9]+$/', $text)) {
+        sendmessage($from_id, "⚠️ لطفا فقط از اعداد انگلیسی (0-9) استفاده کنید و از هرگونه کاراکتر دیگر مانند ویرگول، نقطه یا فاصله خودداری کنید.", $keyboard, 'HTML');
+        return;
+    }
+    
+    $amount = intval($text);
+    
+    // بررسی محدوده مجاز مبلغ
+    if ($amount < 20000 || $amount > 10000000) {
+        sendmessage($from_id, "⚠️ مبلغ وارد شده خارج از محدوده مجاز است!
+مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.", $keyboard, 'HTML');
+        return;
+    }
+    
+    // ذخیره مبلغ برای پردازش
+    update("user", "Processing_value", $amount, "id", $from_id);
+    
+    // نمایش روش‌های پرداخت
+    $payment_methods = getpaymentmethod();
+    if ($payment_methods != false) {
+        $text_payment = "💳 لطفا روش پرداخت خود را انتخاب کنید:
+مبلغ: " . number_format($amount) . " تومان";
+        sendmessage($from_id, $text_payment, $payment_methods, 'HTML');
+        step('get_step_payment', $from_id);
+    }
 }
+// ... existing code ...
