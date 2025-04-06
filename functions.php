@@ -408,13 +408,24 @@ function DirectPayment($order_id){
                 }
                 
                 if(!$agency_user) {
-                    // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
-                    $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-                    $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                    $stmt->execute();
-                    $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                    // بررسی تنظیمات حداقل تعداد خرید
+                    $min_purchase = isset($setting['double_charge_min_purchase']) ? intval($setting['double_charge_min_purchase']) : 3;
                     
-                    if($purchase_count >= 3) {
+                    // اگر min_purchase صفر باشد، نیازی به بررسی تعداد خرید نیست
+                    $meets_purchase_requirement = ($min_purchase == 0);
+                    
+                    // اگر نیاز به بررسی تعداد خرید باشد
+                    if (!$meets_purchase_requirement) {
+                        // بررسی اینکه کاربر به حداقل تعداد خرید رسیده باشد
+                        $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+                        $stmt->bindParam(':user_id', $Payment_report['id_user']);
+                        $stmt->execute();
+                        $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                        
+                        $meets_purchase_requirement = ($purchase_count >= $min_purchase);
+                    }
+                    
+                    if($meets_purchase_requirement) {
                         // بررسی وجود جدول double_charge_users
                         $table_exists = $pdo->prepare("SHOW TABLES LIKE 'double_charge_users'");
                         $table_exists->execute();

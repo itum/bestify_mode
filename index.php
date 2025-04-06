@@ -2757,38 +2757,67 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
                 }
                 
                 if(!$agency_user) {
-                    // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
-                    $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-                    $stmt->bindParam(':user_id', $from_id);
-                    $stmt->execute();
-                    $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                    // بررسی تنظیمات حداقل تعداد خرید
+                    $min_purchase = isset($setting['double_charge_min_purchase']) ? intval($setting['double_charge_min_purchase']) : 3;
                     
-                    if($purchase_count >= 3) {
+                    // اگر min_purchase صفر باشد، نیازی به بررسی تعداد خرید نیست
+                    $meets_purchase_requirement = ($min_purchase == 0);
+                    
+                    // اگر نیاز به بررسی تعداد خرید باشد
+                    if (!$meets_purchase_requirement) {
+                        // بررسی اینکه کاربر به حداقل تعداد خرید رسیده باشد
+                        $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+                        $stmt->bindParam(':user_id', $from_id);
+                        $stmt->execute();
+                        $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                        
+                        $meets_purchase_requirement = ($purchase_count >= $min_purchase);
+                    }
+                    
+                    if($meets_purchase_requirement) {
                         // بررسی وجود جدول double_charge_users
                         try {
                             $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
                             
                             if ($check_table && $check_table->rowCount() > 0) {
                                 // جدول وجود دارد، بررسی کنیم کاربر قبلا استفاده کرده یا نه
-                                $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
-                                $stmt->bindParam(':user_id', $from_id);
-                                $stmt->execute();
-                                
-                                if($stmt->rowCount() == 0) {
-                                    // کاربر واجد شرایط شارژ دوبرابر است
-                                    $double_charge_eligible = true;
+                                try {
+                                    $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                                    $stmt->bindParam(':user_id', $from_id);
+                                    $stmt->execute();
+                                    
+                                    if($stmt->rowCount() == 0) {
+                                        // کاربر واجد شرایط شارژ دوبرابر است
+                                        $double_charge_eligible = true;
+                                    }
+                                } catch (PDOException $e) {
+                                    error_log("خطا در بررسی کاربر در جدول double_charge_users: " . $e->getMessage());
                                 }
                             } else {
-                                // جدول وجود ندارد، آن را ایجاد می‌کنیم
-                                $sql = "CREATE TABLE IF NOT EXISTS double_charge_users (
-                                    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                                    user_id varchar(500) NOT NULL,
-                                    used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
-                                $pdo->exec($sql);
-                                
-                                // کاربر واجد شرایط شارژ دوبرابر است (چون جدول تازه ایجاد شده و خالی است)
-                                $double_charge_eligible = true;
+                                // جدول وجود ندارد، به اجرای اسکریپت table.php متکی می‌شویم
+                                // طبق بررسی کد، جدول در table.php ایجاد شده است
+                                try {
+                                    // یک بار دیگر بررسی می‌کنیم - شاید در این فاصله جدول ایجاد شده باشد
+                                    $check_table_again = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
+                                    if ($check_table_again && $check_table_again->rowCount() > 0) {
+                                        // حالا جدول وجود دارد
+                                        $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                                        $stmt->bindParam(':user_id', $from_id);
+                                        $stmt->execute();
+                                        
+                                        if($stmt->rowCount() == 0) {
+                                            // کاربر واجد شرایط شارژ دوبرابر است
+                                            $double_charge_eligible = true;
+                                        }
+                                    } else {
+                                        // هنوز جدول وجود ندارد، کاربر را واجد شرایط می‌کنیم
+                                        $double_charge_eligible = true;
+                                    }
+                                } catch (PDOException $e) {
+                                    error_log("خطا در بررسی مجدد جدول double_charge_users: " . $e->getMessage());
+                                    // در صورت خطا، فرض می‌کنیم کاربر واجد شرایط است
+                                    $double_charge_eligible = true;
+                                }
                             }
                         } catch (PDOException $e) {
                             // در صورت خطا در بررسی جدول، آن را لاگ می‌کنیم

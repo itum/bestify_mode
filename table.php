@@ -173,7 +173,8 @@ try {
         status_verify varchar(50)  NULL,
         removedayc varchar(100)  NULL,
         statuscategory varchar(100)  NULL,
-        double_charge_status varchar(50)  NULL)
+        double_charge_status varchar(50)  NULL,
+        double_charge_min_purchase INT(11))
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
             echo "table setting".mysqli_error($connect);
@@ -183,7 +184,7 @@ try {
         $active_phone_text = "0";
         $active_phone_iran_text = "0";
         $active_help = "0";
-        $connect->query("INSERT INTO setting (Bot_Status,roll_Status,get_number,limit_usertest_all,time_usertest,val_usertest,help_Status,iran_number,NotUser,namecustome,removedayc,status_verify,statuscategory,double_charge_status) VALUES ('$active_bot_text','$active_roll_text','$active_phone_text','1','1','100','$active_help','$active_phone_iran_text','0','0','1','0','1','off')");
+        $connect->query("INSERT INTO setting (Bot_Status,roll_Status,get_number,limit_usertest_all,time_usertest,val_usertest,help_Status,iran_number,NotUser,namecustome,removedayc,status_verify,statuscategory,double_charge_status,double_charge_min_purchase) VALUES ('$active_bot_text','$active_roll_text','$active_phone_text','1','1','100','$active_help','$active_phone_iran_text','0','0','1','0','1','off','3')");
     } else {
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'status_verify'");
         if (mysqli_num_rows($Check_filde) != 1) {
@@ -196,6 +197,12 @@ try {
             $connect->query("ALTER TABLE setting ADD double_charge_status VARCHAR(50)");
             $connect->query("UPDATE setting SET double_charge_status = 'off'");
             echo "The double_charge_status field was added ✅";
+        }
+        $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'double_charge_min_purchase'");
+        if (mysqli_num_rows($Check_filde) != 1) {
+            $connect->query("ALTER TABLE setting ADD double_charge_min_purchase INT(11)");
+            $connect->query("UPDATE setting SET double_charge_min_purchase = '3'");
+            echo "The double_charge_min_purchase field was added ✅";
         }
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'statuscategory'");
         if (mysqli_num_rows($Check_filde) != 1) {
