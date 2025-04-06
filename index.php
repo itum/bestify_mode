@@ -1413,7 +1413,7 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
 💲 مبلغ مورد نیاز: " . $product_price . " تومان
 ⚠️ کمبود اعتبار: " . $shortage . " تومان
 
-❌ برای افزایش موجودی کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         // ثبت خطا در فایل لاگ برای بررسی
         error_log("Debug error message: " . $error_message);
@@ -1509,7 +1509,7 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
     $textextra = " .";
     sendmessage($from_id, sprintf($textbotlang['users']['Extra_volume']['VolumeValue'],$setting['Extra_volume']), $backuser, 'HTML');
     step('getvolumeextra', $from_id);
-} elseif (isset($user['step']) && $user['step'] == "getvolumeextra") {
+} elseif ($user['step'] == "getvolumeextra") {
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backuser, 'HTML');
         return;
@@ -1567,7 +1567,7 @@ if (preg_match('/subscriptionurl_(\w+)/', $datain, $dataget)) {
 💲 مبلغ مورد نیاز: " . $volume_price . " تومان
 ⚠️ کمبود اعتبار: " . $shortage . " تومان
 
-❌ برای افزایش موجودی کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         // ثبت خطا در فایل لاگ برای بررسی
         error_log("Debug error message: " . $error_message);
@@ -1888,7 +1888,7 @@ if ($text == $datatextbot['text_help'] || $datain == "helpbtn" || $text == "/hel
     }
     sendmessage($from_id, $textbotlang['users']['selectoption'], $json_list_help, 'HTML');
     step('sendhelp', $from_id);
-} elseif (isset($user['step']) && $user['step'] == "sendhelp") {
+} elseif ($user['step'] == "sendhelp") {
     $helpdata = select("help", "*", "name_os", $text, "select");
     if (strlen($helpdata['Media_os']) != 0) {
         if ($helpdata['type_Media_os'] == "video") {
@@ -1906,7 +1906,7 @@ if ($text == $datatextbot['text_support'] || $text == "/support") {
 } elseif ($datain == "support") {
     sendmessage($from_id, $textbotlang['users']['support']['sendmessageuser'], $backuser, 'HTML');
     step('gettextpm', $from_id);
-} elseif (isset($user['step']) && $user['step'] == 'gettextpm') {
+} elseif ($user['step'] == 'gettextpm') {
     sendmessage($from_id, $textbotlang['users']['support']['sendmessageadmin'], $keyboard, 'HTML');
     $Response = json_encode([
         'inline_keyboard' => [
@@ -2143,7 +2143,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     update("user", "Processing_value_one", $prodcut, "id", $from_id);
     sendmessage($from_id, $textbotlang['users']['selectusername'], $backuser, 'html');
     step('endstepuser', $from_id);
-} elseif (isset($user['step']) && $user['step'] == "endstepuser" || preg_match('/prodcutservice_(.*)/', $datain, $dataget)) {
+} elseif ($user['step'] == "endstepuser" || preg_match('/prodcutservice_(.*)/', $datain, $dataget)) {
     if (preg_match('/prodcutservice_(.*)/', $datain, $dataget)) {
         $code_product = $dataget[1];
     } else {
@@ -2284,7 +2284,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         }
         step('payment', $from_id);
     }
-} elseif (isset($user['step']) && $user['step'] == "payment" && $datain == "confirmandgetservice" || $datain == "confirmandgetserviceDiscount") {
+} elseif ($user['step'] == "payment" && $datain == "confirmandgetservice" || $datain == "confirmandgetserviceDiscount") {
     Editmessagetext($from_id, $message_id, $text_callback, json_encode(['inline_keyboard' => []]));
     
     // بررسی وضعیت نمایندگی کاربر
@@ -2359,7 +2359,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
 💲 مبلغ مورد نیاز: " . $price_format . " تومان
 ⚠️ کمبود اعتبار: " . $shortage . " تومان
 
-❌ برای افزایش موجودی کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
             
             // ثبت خطا در فایل لاگ برای بررسی
             error_log("Debug error message: " . $error_message);
@@ -2468,7 +2468,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
 💲 مبلغ مورد نیاز: " . $price_format . " تومان
 ⚠️ کمبود اعتبار: " . $shortage . " تومان
 
-❌ برای افزایش موجودی کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
         // ثبت خطا در فایل لاگ برای بررسی
         error_log("Debug error message: " . $error_message);
@@ -2666,7 +2666,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     sendmessage($from_id, $textbotlang['users']['Discount']['getcodesell'], $backuser, 'HTML');
     step('getcodesellDiscount', $from_id);
     deletemessage($from_id, $message_id);
-} elseif (isset($user['step']) && $user['step'] == "getcodesellDiscount") {
+} elseif ($user['step'] == "getcodesellDiscount") {
     // بررسی کن که کاربر نماینده نباشد
     $checkAgency = select("agency", "*", "user_id", $from_id, "select");
     if ($checkAgency && $checkAgency['status'] == 'approved') {
@@ -2867,10 +2867,10 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         ]
     ]);
     
-    $text = $double_charge_text . "لطفا مبلغ مورد نظر برای افزایش موجودیتون رو انتخاب کنید:";
+    $text = $double_charge_text . "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
     sendmessage($from_id, $text, $payment_markup, 'HTML');
     
-} elseif (isset($user['step']) && $user['step'] == "getprice") {
+} elseif ($user['step'] == "getprice") {
     if (!is_numeric($text))
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorprice'], null, 'HTML');
     if ($text > 10000000 or $text < 5000)
@@ -2878,7 +2878,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     update("user", "Processing_value", $text, "id", $from_id);
     sendmessage($from_id, $textbotlang['users']['Balance']['selectPatment'], $step_payment, 'HTML');
     step('get_step_payment', $from_id);
-} elseif (isset($user['step']) && $user['step'] == "get_step_payment") {
+} elseif ($user['step'] == "get_step_payment") {
     if ($datain == "cart_to_offline") {
         $PaySetting = select("PaySetting", "ValuePay", "NamePay", "CartDescription", "select")['ValuePay'];
         $Processing_value = number_format($user['Processing_value']);
@@ -3025,7 +3025,7 @@ if ($user['step'] == "getvcodeuser") {
     update("user", "Processing_value", $text, "id", $from_id);
     step('getvnumbervuser', $from_id);
     sendmessage($from_id, $textbotlang['users']['perfectmoney']['getvnumber'], $backuser, 'HTML');
-} elseif (isset($user['step']) && $user['step'] == "getvnumbervuser") {
+} elseif ($user['step'] == "getvnumbervuser") {
     step('home', $from_id);
     $Voucher = ActiveVoucher($user['Processing_value'], $text);
     $lines = explode("\n", $Voucher);
@@ -3161,7 +3161,7 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
             )
         );
     }
-} elseif (isset($user['step']) && $user['step'] == "cart_to_cart_user") {
+} elseif ($user['step'] == "cart_to_cart_user") {
     if (!$photo) {
         sendmessage($from_id, $textbotlang['users']['Balance']['Invalid-receipt'], null, 'HTML');
         return;
@@ -3223,7 +3223,7 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
 if ($datain == "Discount") {
     sendmessage($from_id, $textbotlang['users']['Discount']['getcode'], $backuser, 'HTML');
     step('get_code_user', $from_id);
-} elseif (isset($user['step']) && $user['step'] == "get_code_user") {
+} elseif ($user['step'] == "get_code_user") {
     if (!in_array($text, $code_Discount)) {
         sendmessage($from_id, $textbotlang['users']['Discount']['notcode'], null, 'HTML');
         return;
@@ -3321,7 +3321,7 @@ if ($text == $textbotlang['users']['agency']['request_button']) {
         sendmessage($from_id, $textbotlang['users']['agency']['request_msg'], $backuser, 'html');
         update("user", "step", "agency_request", "id", $from_id);
     }
-} elseif (isset($user['step']) && $user['step'] == "agency_request") {
+} elseif ($user['step'] == "agency_request") {
     if ($text == $textbotlang['users']['backhome']) {
         sendmessage($from_id, $textbotlang['users']['back'], $keyboard, 'html');
         update("user", "step", "none", "id", $from_id);
@@ -4097,7 +4097,7 @@ elseif ($datain == "paypanel") {
         ]
     ]);
     
-    $text = "لطفا مبلغ مورد نظر برای افزایش موجودیتون رو انتخاب کنید:";
+    $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
     
     if(isset($message_id)) {
         Editmessagetext($from_id, $message_id, $text, $payment_markup);

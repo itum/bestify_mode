@@ -204,11 +204,11 @@ try {
             $connect->query("UPDATE setting SET double_charge_min_purchase = '3'");
             echo "The double_charge_min_purchase field was added ✅";
         }
-        $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'double_charge_expire_hours'");
+        $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'double_charge_expiry_hours'");
         if (mysqli_num_rows($Check_filde) != 1) {
-            $connect->query("ALTER TABLE setting ADD double_charge_expire_hours INT(11)");
-            $connect->query("UPDATE setting SET double_charge_expire_hours = '72'");
-            echo "The double_charge_expire_hours field was added ✅";
+            $connect->query("ALTER TABLE setting ADD double_charge_expiry_hours INT(11) DEFAULT 72");
+            $connect->query("UPDATE setting SET double_charge_expiry_hours = '72'");
+            echo "The double_charge_expiry_hours field was added ✅";
         }
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'statuscategory'");
         if (mysqli_num_rows($Check_filde) != 1) {
@@ -792,6 +792,28 @@ try {
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
             echo "table double_charge_users".mysqli_error($connect);
+        }
+    }
+} catch (Exception $e) {
+    file_put_contents('error_log',$e->getMessage());
+}
+
+//----------------------- [ double_charge_notifications ] --------------------- //
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'double_charge_notifications'");
+    $table_exists = ($result->num_rows > 0);
+
+    if (!$table_exists) {
+        $result = $connect->query("CREATE TABLE double_charge_notifications (
+        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id varchar(500) NOT NULL,
+        notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        expiry_hours INT(11) NOT NULL,
+        UNIQUE KEY unique_user_id (user_id))
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+        if (!$result) {
+            echo "table double_charge_notifications".mysqli_error($connect);
         }
     }
 } catch (Exception $e) {

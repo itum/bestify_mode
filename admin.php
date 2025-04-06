@@ -46,7 +46,9 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
     $setting = select("setting", "*");
     $status = ($setting['double_charge_status'] == 'on') ? '✅ فعال' : '❌ غیرفعال';
     $min_purchase = $setting['double_charge_min_purchase'];
-    $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
+    
+    // بررسی وجود فیلد مهلت زمانی
+    $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
     
     $purchase_guide = "";
     if ($min_purchase == 0) {
@@ -59,7 +61,7 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
 
 ▫️ وضعیت فعلی: $status
 ▫️ حداقل تعداد خرید لازم: $purchase_guide
-▫️ مهلت استفاده: $expire_hours ساعت
+▫️ مهلت استفاده از طرح: $expiry_hours ساعت
 ▫️ توضیحات: با این قابلیت، کاربرانی که به حد نصاب خرید رسیده باشند می‌توانند یکبار از امکان شارژ دوبرابر استفاده کنند.
 ▫️ کاربران نماینده مشمول این طرح نمی‌شوند.
 ▫️ راهنما: برای تغییر حداقل تعداد خرید مورد نیاز، از دکمه زیر استفاده کنید. اگر مقدار 0 را وارد کنید، تمامی کاربران بدون محدودیت می‌توانند از این ویژگی استفاده کنند.";
@@ -3190,22 +3192,16 @@ elseif ($user['step'] == "notify_double_charge_users") {
             $count = 0;
             $success = 0;
             
-            // دریافت مهلت استفاده از تنظیمات
+            // دریافت مهلت زمانی از تنظیمات
             $setting = select("setting", "*");
-            $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
-            
-            // محاسبه تاریخ و زمان انقضا
-            $now = time();
-            $expire_timestamp = $now + ($expire_hours * 3600);
-            $expire_date = jdate("Y/m/d", $expire_timestamp);
-            $expire_time = jdate("H:i", $expire_timestamp);
+            $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
             
             foreach ($_SESSION['eligible_users'] as $user_info) {
                 $count++;
                 $user_id = $user_info['id'];
                 $username = $user_info['username'];
                 
-                // پیام اطلاع‌رسانی با مهلت استفاده
+                // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
                 $notification_message = "🎉 خبر خوب {$username} عزیز!
 
 💰 شما واجد شرایط استفاده از طرح ویژه شارژ دوبرابر هستید!
@@ -3214,11 +3210,11 @@ elseif ($user['step'] == "notify_double_charge_users") {
 
 مثال: اگر 200 هزار تومان شارژ کنید، 400 هزار تومان به حساب شما افزوده می‌شود!
 
-⏱ مهلت استفاده: $expire_hours ساعت (تا تاریخ $expire_date ساعت $expire_time)
+⏱ توجه: مهلت استفاده از این طرح فقط {$expiry_hours} ساعت است!
 
 🔴 نکته مهم: این فرصت فقط یک‌بار قابل استفاده است، پس حتماً از آن به بهترین شکل بهره‌مند شوید.
 
-برای افزایش موجودی، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 افزایش موجودی» را انتخاب نمایید.
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 موفق باشید!";
                 
@@ -3231,13 +3227,51 @@ elseif ($user['step'] == "notify_double_charge_users") {
                 
                 if (isset($result['ok']) && $result['ok']) {
                     $success++;
+                    
+                    // ثبت زمان ارسال اطلاعیه برای کاربر
+                    try {
+                        // بررسی وجود جدول
+                        $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                        
+                        if ($check_table && $check_table->rowCount() == 0) {
+                            // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                            $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
+                                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                user_id varchar(500) NOT NULL,
+                                notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                expiry_hours INT(11) NOT NULL
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                        }
+                        
+                        // محاسبه زمان انقضا
+                        $notified_at = date('Y-m-d H:i:s');
+                        $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
+                        
+                        // ثبت رکورد جدید یا بروزرسانی رکورد موجود
+                        $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
+                                           VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
+                                           ON DUPLICATE KEY UPDATE 
+                                           notified_at = :notified_at,
+                                           expiry_at = :expiry_at,
+                                           expiry_hours = :expiry_hours");
+                        
+                        $stmt->bindParam(':user_id', $user_id);
+                        $stmt->bindParam(':notified_at', $notified_at);
+                        $stmt->bindParam(':expiry_at', $expiry_at);
+                        $stmt->bindParam(':expiry_hours', $expiry_hours);
+                        $stmt->execute();
+                        
+                    } catch (PDOException $e) {
+                        error_log("خطا در ثبت اطلاع‌رسانی شارژ دوبرابر: " . $e->getMessage());
+                    }
                 }
                 
                 // کمی صبر برای جلوگیری از محدودیت تلگرام
                 sleep(1);
             }
             
-            sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success), $double_charge_keyboard, 'HTML');
+            sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success) . "\n\n⏱ مهلت استفاده: {$expiry_hours} ساعت", $double_charge_keyboard, 'HTML');
             step('none', $from_id);
             
             // پاک کردن سشن
@@ -3252,40 +3286,40 @@ elseif ($user['step'] == "notify_double_charge_users") {
     }
 }
 
-// اضافه کردن کد تنظیم مهلت استفاده
+// اضافه کردن بخش تنظیم مهلت استفاده
 elseif ($text == "⏱ تنظیم مهلت استفاده") {
     $setting = select("setting", "*");
-    $expire_hours = isset($setting['double_charge_expire_hours']) ? $setting['double_charge_expire_hours'] : 72;
+    $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
     
-    sendmessage($from_id, "⏱ تنظیم مهلت استفاده از شارژ دوبرابر\n\n🔹 مقدار فعلی: $expire_hours ساعت\n\n👈 لطفاً مدت زمان اعتبار پیشنهاد شارژ دوبرابر را به ساعت وارد کنید:", $backuser, 'HTML');
-    step('set_double_charge_expire_hours', $from_id);
+    sendmessage($from_id, "⏱ لطفاً مهلت استفاده از طرح شارژ دوبرابر را بر حسب ساعت وارد کنید.\n\n👈 مقدار فعلی: $expiry_hours ساعت\n\n🔔 این مدت از زمان ارسال اطلاع‌رسانی به کاربر محاسبه می‌شود.", $backuser, 'HTML');
+    step('set_double_charge_expiry', $from_id);
 }
 
-// رسیدگی به مرحله تنظیم مهلت استفاده
-elseif ($user['step'] == "set_double_charge_expire_hours") {
+elseif ($user['step'] == "set_double_charge_expiry") {
     // بررسی ورودی عددی
     if (!is_numeric($text) || intval($text) <= 0) {
         sendmessage($from_id, "❌ لطفاً یک عدد صحیح بزرگتر از صفر وارد کنید.", null, 'HTML');
         return;
     }
     
-    $expire_hours = intval($text);
+    $expiry_hours = intval($text);
     
-    // اضافه کردن فیلد به جدول اگر وجود نداشته باشد
+    // بررسی وجود ستون در دیتابیس
     try {
-        $stmt = $pdo->prepare("SELECT * FROM information_schema.columns WHERE table_schema = DATABASE() AND table_name = 'setting' AND column_name = 'double_charge_expire_hours'");
-        $stmt->execute();
-        if ($stmt->rowCount() == 0) {
-            // فیلد وجود ندارد، آن را اضافه می‌کنیم
-            $stmt = $pdo->prepare("ALTER TABLE setting ADD COLUMN double_charge_expire_hours INT(11) DEFAULT 72");
-            $stmt->execute();
+        $check_column = $pdo->query("SHOW COLUMNS FROM setting LIKE 'double_charge_expiry_hours'");
+        
+        if ($check_column && $check_column->rowCount() == 0) {
+            // ستون وجود ندارد، آن را اضافه می‌کنیم
+            $pdo->exec("ALTER TABLE setting ADD COLUMN double_charge_expiry_hours INT(11) DEFAULT 72");
         }
+        
+        // بروزرسانی مقدار
+        update("setting", "double_charge_expiry_hours", $expiry_hours);
+        
+        sendmessage($from_id, "✅ مهلت استفاده از طرح شارژ دوبرابر با موفقیت به $expiry_hours ساعت تغییر یافت.", $double_charge_keyboard, 'HTML');
+        step('none', $from_id);
     } catch (PDOException $e) {
-        error_log("خطا در بررسی یا ایجاد فیلد double_charge_expire_hours: " . $e->getMessage());
+        sendmessage($from_id, "❌ خطا در بروزرسانی تنظیمات: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+        step('none', $from_id);
     }
-    
-    update("setting", "double_charge_expire_hours", $expire_hours);
-    
-    sendmessage($from_id, "✅ مهلت استفاده از شارژ دوبرابر با موفقیت به $expire_hours ساعت تغییر یافت.", $double_charge_keyboard, 'HTML');
-    step('none', $from_id);
 }
