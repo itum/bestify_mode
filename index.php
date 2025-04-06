@@ -2262,7 +2262,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment_agency, 'HTML');
         } else {
-            sendmessage($from_id, $textin, $payment_agency, 'HTML');
+        sendmessage($from_id, $textin, $payment_agency, 'HTML');
         }
         step('payment', $from_id);
     } else {
@@ -2280,7 +2280,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         if (isset($message_id)) {
             Editmessagetext($from_id, $message_id, $textin, $payment, 'HTML');
         } else {
-            sendmessage($from_id, $textin, $payment, 'HTML');
+        sendmessage($from_id, $textin, $payment, 'HTML');
         }
         step('payment', $from_id);
     }
@@ -3960,98 +3960,58 @@ elseif ($user['step'] == "search_date") {
 // پردازش نام نمایشی
 if (preg_match('/display_name_(\w+)/', $datain, $dataget)) {
 // ... existing code ...
-} elseif ($data == "paypanel") {
-    // پیام مربوط به افزایش موجودی
-    $payment_message = "💳 لطفاً مبلغ مورد نظر برای شارژ کیف پول را انتخاب کنید:
+}
 
-⚠️ برای وارد کردن مبلغ دلخواه از دکمه «مبلغ دلخواه» استفاده کنید.
-⚠️ مبلغ دلخواه باید بین 20 هزار تا 10 میلیون تومان باشد.
-⚠️ لطفا توجه داشته باشید که مبلغ را فقط با اعداد انگلیسی وارد کنید.";
-
-    // ایجاد کیبورد با مبالغ پیشنهادی
-    $keyboard = [
+elseif ($datain == "paypanel") {
+    $payment_markup = json_encode([
         'inline_keyboard' => [
             [
-                ['text' => "💰 20,000 تومان", 'callback_data' => "increase_balance_20000"],
-                ['text' => "💰 50,000 تومان", 'callback_data' => "increase_balance_50000"]
+                ['text' => '50,000 تومان', 'callback_data' => 'add_balance_50000'],
+                ['text' => '75,000 تومان', 'callback_data' => 'add_balance_75000'],
             ],
             [
-                ['text' => "💰 100,000 تومان", 'callback_data' => "increase_balance_100000"],
-                ['text' => "💰 200,000 تومان", 'callback_data' => "increase_balance_200000"]
+                ['text' => '100,000 تومان', 'callback_data' => 'add_balance_100000'],
+                ['text' => '150,000 تومان', 'callback_data' => 'add_balance_150000'],
             ],
             [
-                ['text' => "💰 500,000 تومان", 'callback_data' => "increase_balance_500000"],
-                ['text' => "💰 1,000,000 تومان", 'callback_data' => "increase_balance_1000000"]
+                ['text' => '200,000 تومان', 'callback_data' => 'add_balance_200000'],
+                ['text' => '250,000 تومان', 'callback_data' => 'add_balance_250000'],
             ],
             [
-                ['text' => "💰 مبلغ دلخواه", 'callback_data' => "custom_balance"]
+                ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
+                ['text' => '1,000,000 تومان', 'callback_data' => 'add_balance_1000000'],
             ],
             [
-                ['text' => "🔙 بازگشت به منوی اصلی", 'callback_data' => "backuser"]
+                ['text' => 'بازگشت', 'callback_data' => 'backuser'],
             ]
         ]
-    ];
-
-    // ارسال یا ویرایش پیام با کیبورد جدید
-    Editmessagetext($from_id, $message_id, $payment_message, json_encode($keyboard), 'HTML');
+    ]);
     
-} elseif (preg_match('/^increase_balance_(\d+)$/', $data, $matches)) {
-    // دریافت مبلغ انتخاب شده
-    $amount = $matches[1];
+    $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
     
-    // ذخیره مبلغ برای پردازش
-    update("user", "Processing_value", $amount, "id", $from_id);
-    
-    // نمایش روش‌های پرداخت
-    $payment_methods = getpaymentmethod();
-    if ($payment_methods != false) {
-        $text_payment = "💳 لطفا روش پرداخت خود را انتخاب کنید:
-مبلغ: " . number_format($amount) . " تومان";
-        Editmessagetext($from_id, $message_id, $text_payment, $payment_methods, 'HTML');
-        step('get_step_payment', $from_id);
-    }
-    
-} elseif ($data == "custom_balance") {
-    // پیام درخواست مبلغ دلخواه
-    $message_text = "💲 لطفا مبلغ دلخواه خود را به تومان وارد کنید:
-
-⚠️ مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.
-⚠️ لطفا فقط از اعداد انگلیسی (0-9) استفاده کنید.
-⚠️ بدون هیچ کاراکتر اضافی مانند ویرگول، نقطه یا فاصله.";
-
-    Editmessagetext($from_id, $message_id, $message_text, json_encode([
-        'inline_keyboard' => [
-            [['text' => "🔙 بازگشت", 'callback_data' => "paypanel"]]
-        ]
-    ]), 'HTML');
-    step('custom_payment_amount', $from_id);
-    
-} elseif ($user['step'] == "custom_payment_amount") {
-    // بررسی صحت مبلغ وارد شده
-    if (!preg_match('/^[0-9]+$/', $text)) {
-        sendmessage($from_id, "⚠️ لطفا فقط از اعداد انگلیسی (0-9) استفاده کنید و از هرگونه کاراکتر دیگر مانند ویرگول، نقطه یا فاصله خودداری کنید.", $keyboard, 'HTML');
-        return;
-    }
-    
-    $amount = intval($text);
-    
-    // بررسی محدوده مجاز مبلغ
-    if ($amount < 20000 || $amount > 10000000) {
-        sendmessage($from_id, "⚠️ مبلغ وارد شده خارج از محدوده مجاز است!
-مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.", $keyboard, 'HTML');
-        return;
-    }
-    
-    // ذخیره مبلغ برای پردازش
-    update("user", "Processing_value", $amount, "id", $from_id);
-    
-    // نمایش روش‌های پرداخت
-    $payment_methods = getpaymentmethod();
-    if ($payment_methods != false) {
-        $text_payment = "💳 لطفا روش پرداخت خود را انتخاب کنید:
-مبلغ: " . number_format($amount) . " تومان";
-        sendmessage($from_id, $text_payment, $payment_methods, 'HTML');
-        step('get_step_payment', $from_id);
+    if(isset($message_id)) {
+        Editmessagetext($from_id, $message_id, $text, $payment_markup);
+    } else {
+        sendmessage($from_id, $text, $payment_markup);
     }
 }
-// ... existing code ...
+elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
+    $amount = $matches[1];
+    
+    // Проверка допустимой суммы (от 20,000 до 10,000,000 туманов)
+    if ($amount < 20000 || $amount > 10000000) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.",
+            'show_alert' => true
+        ]);
+        return;
+    }
+    
+    // Сохранение суммы для дальнейшей обработки
+    update("user", "Processing_value", $amount, "id", $from_id);
+    
+    // Отображение выбора метода оплаты
+    sendmessage($from_id, $textbotlang['users']['Balance']['selectpayment'], $step_payment, 'HTML');
+    step('get_step_payment', $from_id);
+}
