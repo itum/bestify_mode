@@ -2760,12 +2760,41 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     }
     if ($user['number'] == "none" && $setting['get_number'] == "1")
         return;
-    sendmessage($from_id, $textbotlang['users']['Balance']['priceinput'], $backuser, 'HTML');
-    step('getprice', $from_id);
+        
+    // استفاده از کیبورد مبالغ از پیش تعیین شده
+    $payment_markup = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => '50,000 تومان', 'callback_data' => 'add_balance_50000'],
+                ['text' => '75,000 تومان', 'callback_data' => 'add_balance_75000'],
+            ],
+            [
+                ['text' => '100,000 تومان', 'callback_data' => 'add_balance_100000'],
+                ['text' => '150,000 تومان', 'callback_data' => 'add_balance_150000'],
+            ],
+            [
+                ['text' => '200,000 تومان', 'callback_data' => 'add_balance_200000'],
+                ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
+            ],
+            [
+                ['text' => '1,000,000 تومان', 'callback_data' => 'add_balance_1000000'],
+            ],
+            [
+                ['text' => '🔢 مبلغ دلخواه', 'callback_data' => 'add_balance_custom'],
+            ],
+            [
+                ['text' => 'بازگشت', 'callback_data' => 'backuser'],
+            ]
+        ]
+    ]);
+    
+    $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
+    sendmessage($from_id, $text, $payment_markup, 'HTML');
+    
 } elseif ($user['step'] == "getprice") {
     if (!is_numeric($text))
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorprice'], null, 'HTML');
-    if ($text > 10000000 or $text < 20000)
+    if ($text > 10000000 or $text < 5000)
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorpricelimit'], null, 'HTML');
     update("user", "Processing_value", $text, "id", $from_id);
     sendmessage($from_id, $textbotlang['users']['Balance']['selectPatment'], $step_payment, 'HTML');
@@ -3975,11 +4004,13 @@ elseif ($datain == "paypanel") {
             ],
             [
                 ['text' => '200,000 تومان', 'callback_data' => 'add_balance_200000'],
-                ['text' => '250,000 تومان', 'callback_data' => 'add_balance_250000'],
+                ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
             ],
             [
-                ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
                 ['text' => '1,000,000 تومان', 'callback_data' => 'add_balance_1000000'],
+            ],
+            [
+                ['text' => '🔢 مبلغ دلخواه', 'callback_data' => 'add_balance_custom'],
             ],
             [
                 ['text' => 'بازگشت', 'callback_data' => 'backuser'],
@@ -3995,14 +4026,18 @@ elseif ($datain == "paypanel") {
         sendmessage($from_id, $text, $payment_markup);
     }
 }
+elseif ($datain == "add_balance_custom") {
+    Editmessagetext($from_id, $message_id, "💸 لطفا مبلغ دلخواه خود را به تومان وارد کنید:\n⚠️ حداقل مبلغ: 5,000 تومان\n⚠️ حداکثر مبلغ: 10,000,000 تومان", $backuser);
+    step('getprice', $from_id);
+}
 elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
     $amount = $matches[1];
     
-    // Проверка допустимой суммы (от 20,000 до 10,000,000 туманов)
-    if ($amount < 20000 || $amount > 10000000) {
+    // Проверка допустимой суммы (от 5,000 до 10,000,000 туманов)
+    if ($amount < 5000 || $amount > 10000000) {
         telegram('answerCallbackQuery', [
             'callback_query_id' => $callback_query_id,
-            'text' => "مبلغ باید بین 20,000 تا 10,000,000 تومان باشد.",
+            'text' => "مبلغ باید بین 5,000 تا 10,000,000 تومان باشد.",
             'show_alert' => true
         ]);
         return;
@@ -4012,6 +4047,6 @@ elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
     update("user", "Processing_value", $amount, "id", $from_id);
     
     // Отображение выбора метода оплаты
-    sendmessage($from_id, $textbotlang['users']['Balance']['selectpayment'], $step_payment, 'HTML');
+    Editmessagetext($from_id, $message_id, $textbotlang['users']['Balance']['selectpayment'], $step_payment);
     step('get_step_payment', $from_id);
 }
