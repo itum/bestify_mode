@@ -2627,35 +2627,14 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         ]);
         sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
         unlink($urlimage);
-    }elseif ($marzban_list_get['config'] == "onconfig") {
-        if (count($dataoutput['configs']) == 1) {
-            $urlimage = "$from_id$randomString.png";
-            $writer = new PngWriter();
-            $qrCode = QrCode::create($configqr)
-                ->setEncoding(new Encoding('UTF-8'))
-                ->setErrorCorrectionLevel(ErrorCorrectionLevel::Low)
-                ->setSize(400)
-                ->setMargin(0)
-                ->setRoundBlockSizeMode(RoundBlockSizeMode::Margin);
-            $result = $writer->write($qrCode,null, null);
-            $result->saveToFile($urlimage);
-            telegram('sendphoto', [
-                'chat_id' => $from_id,
-                'photo' => new CURLFile($urlimage),
-                'reply_markup' => $Shoppinginfo,
-                'caption' => $textcreatuser,
-                'parse_mode' => "HTML",
-            ]);
-            unlink($urlimage);
-        } else {
-            sendmessage($from_id, $textcreatuser, $Shoppinginfo, 'HTML');
-        }
-    } else {
-        sendmessage($from_id, $textcreatuser, $Shoppinginfo, 'HTML');
+    }else{
+        sendmessage($from_id, $textcreatuser, $usertestinfo, 'HTML');
+        sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
     }
-    $Balance_prim = $user['Balance'] - $priceproduct;
-    update("user", "Balance", $Balance_prim, "id", $from_id);
-    $user['Balance'] = number_format($user['Balance'], 0);
+    step('home', $from_id);
+    $limit_usertest = $user['limit_usertest'] - 1;
+    update("user", "limit_usertest", $limit_usertest, "id", $from_id);
+    step('home', $from_id);
     $text_report = sprintf($textbotlang['users']['Report']['reportbuy'],
         $username_ac,
         is_numeric($info_product['price_product']) ? $info_product['price_product'] : 0,
@@ -2669,7 +2648,6 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     if (isset($setting['Channel_Report']) &&strlen($setting['Channel_Report']) > 0) {
         sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
     }
-    step('home', $from_id);
 } elseif ($datain == "aptdc") {
     // بررسی کن که کاربر نماینده نباشد
     $checkAgency = select("agency", "*", "user_id", $from_id, "select");
@@ -2764,35 +2742,73 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     $double_charge_eligible = false;
     $double_charge_text = "";
     
-    // بررسی فعال بودن ویژگی شارژ دوبرابر
-    if ($setting['double_charge_status'] == 'on') {
-        // بررسی اینکه کاربر نماینده نباشد
-        $agency_user = select("agency", "*", "user_id", $from_id, "select");
-        
-        if(!$agency_user) {
-            // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
-            $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-            $stmt->bindParam(':user_id', $from_id);
-            $stmt->execute();
-            $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
-            
-            if($purchase_count >= 3) {
-                // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
-                $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
-                $stmt->bindParam(':user_id', $from_id);
-                $stmt->execute();
-                
-                if($stmt->rowCount() == 0) {
-                    // کاربر واجد شرایط شارژ دوبرابر است
-                    $double_charge_eligible = true;
+    try {
+        // بررسی فعال بودن ویژگی شارژ دوبرابر
+        if(isset($setting['double_charge_status']) && $setting['double_charge_status'] == 'on') {
+            // بررسی اینکه کاربر نماینده نباشد
+            $agency_user = false;
+            try {
+                $check_agency_table = $pdo->query("SHOW TABLES LIKE 'agency'");
+                if ($check_agency_table && $check_agency_table->rowCount() > 0) {
+                    $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
+                    $stmt_agency->bindParam(':user_id', $from_id);
+                    $stmt_agency->execute();
+                    $agency_user = $stmt_agency->rowCount() > 0;
                 }
+                
+                if(!$agency_user) {
+                    // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
+                    $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+                    $stmt->bindParam(':user_id', $from_id);
+                    $stmt->execute();
+                    $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                    
+                    if($purchase_count >= 3) {
+                        // بررسی وجود جدول double_charge_users
+                        try {
+                            $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
+                            
+                            if ($check_table && $check_table->rowCount() > 0) {
+                                // جدول وجود دارد، بررسی کنیم کاربر قبلا استفاده کرده یا نه
+                                $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                                $stmt->bindParam(':user_id', $from_id);
+                                $stmt->execute();
+                                
+                                if($stmt->rowCount() == 0) {
+                                    // کاربر واجد شرایط شارژ دوبرابر است
+                                    $double_charge_eligible = true;
+                                }
+                            } else {
+                                // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                                $sql = "CREATE TABLE IF NOT EXISTS double_charge_users (
+                                    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                    user_id varchar(500) NOT NULL,
+                                    used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin";
+                                $pdo->exec($sql);
+                                
+                                // کاربر واجد شرایط شارژ دوبرابر است (چون جدول تازه ایجاد شده و خالی است)
+                                $double_charge_eligible = true;
+                            }
+                        } catch (PDOException $e) {
+                            // در صورت خطا در بررسی جدول، آن را لاگ می‌کنیم
+                            error_log("خطا در بررسی جدول double_charge_users: " . $e->getMessage());
+                        }
+                    }
+                }
+            } catch (PDOException $e) {
+                // خطای دیتابیس در حین بررسی شرایط
+                error_log("خطا در بررسی شرایط شارژ دوبرابر (بخش بررسی نماینده): " . $e->getMessage());
             }
         }
-    }
-    
-    // اضافه کردن پیام شارژ دوبرابر به متن اصلی
-    if ($double_charge_eligible) {
-        $double_charge_text = "🎁 تبریک! شما واجد شرایط شارژ دوبرابر هستید!\n💯 یکبار می‌توانید با هر مبلغی که واریز کنید، شارژ دوبرابر دریافت کنید.\n\n";
+        
+        // اضافه کردن پیام شارژ دوبرابر به متن اصلی
+        if ($double_charge_eligible) {
+            $double_charge_text = "🎁 تبریک! شما واجد شرایط شارژ دوبرابر هستید!\n💯 یکبار می‌توانید با هر مبلغی که واریز کنید، شارژ دوبرابر دریافت کنید.\n\n";
+        }
+    } catch (PDOException $e) {
+        // در صورت بروز خطا، آن را لاگ می‌کنیم ولی ادامه می‌دهیم
+        error_log("خطا در بررسی شرایط شارژ دوبرابر: " . $e->getMessage());
     }
         
     // استفاده از کیبورد مبالغ از پیش تعیین شده
