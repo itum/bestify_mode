@@ -2652,7 +2652,6 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         }
     } else {
         sendmessage($from_id, $textcreatuser, $Shoppinginfo, 'HTML');
-        sendmessage($from_id, $textbotlang['users']['selectoption'], $keyboard, 'HTML');
     }
     $Balance_prim = $user['Balance'] - $priceproduct;
     update("user", "Balance", $Balance_prim, "id", $from_id);
@@ -2760,6 +2759,41 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     }
     if ($user['number'] == "none" && $setting['get_number'] == "1")
         return;
+    
+    // بررسی شرایط و نمایش پیام شارژ دوبرابر اگر کاربر واجد شرایط باشد
+    $double_charge_eligible = false;
+    $double_charge_text = "";
+    
+    // بررسی فعال بودن ویژگی شارژ دوبرابر
+    if ($setting['double_charge_status'] == 'on') {
+        // بررسی اینکه کاربر نماینده نباشد
+        $agency_user = select("agency", "*", "user_id", $from_id, "select");
+        
+        if(!$agency_user) {
+            // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
+            $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+            $stmt->bindParam(':user_id', $from_id);
+            $stmt->execute();
+            $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+            
+            if($purchase_count >= 3) {
+                // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
+                $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                $stmt->bindParam(':user_id', $from_id);
+                $stmt->execute();
+                
+                if($stmt->rowCount() == 0) {
+                    // کاربر واجد شرایط شارژ دوبرابر است
+                    $double_charge_eligible = true;
+                }
+            }
+        }
+    }
+    
+    // اضافه کردن پیام شارژ دوبرابر به متن اصلی
+    if ($double_charge_eligible) {
+        $double_charge_text = "🎁 تبریک! شما واجد شرایط شارژ دوبرابر هستید!\n💯 یکبار می‌توانید با هر مبلغی که واریز کنید، شارژ دوبرابر دریافت کنید.\n\n";
+    }
         
     // استفاده از کیبورد مبالغ از پیش تعیین شده
     $payment_markup = json_encode([
@@ -2788,7 +2822,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         ]
     ]);
     
-    $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
+    $text = $double_charge_text . "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
     sendmessage($from_id, $text, $payment_markup, 'HTML');
     
 } elseif ($user['step'] == "getprice") {
