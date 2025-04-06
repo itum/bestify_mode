@@ -388,11 +388,61 @@ function DirectPayment($order_id){
             );
         }
     }else {
-        $Balance_confrim = intval($Balance_id['Balance']) + intval($Payment_report['price']);
+        // بررسی امکان شارژ دوبرابر
+        $double_charge = false;
+        
+        // بررسی فعال بودن ویژگی شارژ دوبرابر
+        if($setting['double_charge_status'] == 'on') {
+            // بررسی اینکه کاربر نماینده نباشد
+            $agency_user = select("agency", "*", "user_id", $Payment_report['id_user'], "select");
+            
+            if(!$agency_user) {
+                // بررسی اینکه کاربر حداقل 3 خرید داشته باشد
+                $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
+                $stmt->bindParam(':user_id', $Payment_report['id_user']);
+                $stmt->execute();
+                $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                
+                if($purchase_count >= 3) {
+                    // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
+                    $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                    $stmt->bindParam(':user_id', $Payment_report['id_user']);
+                    $stmt->execute();
+                    
+                    if($stmt->rowCount() == 0) {
+                        // کاربر واجد شرایط شارژ دوبرابر است
+                        $double_charge = true;
+                        
+                        // ثبت استفاده کاربر از ویژگی شارژ دوبرابر
+                        $stmt = $pdo->prepare("INSERT INTO double_charge_users (user_id) VALUES (:user_id)");
+                        $stmt->bindParam(':user_id', $Payment_report['id_user']);
+                        $stmt->execute();
+                    }
+                }
+            }
+        }
+        
+        // محاسبه مبلغ شارژ (عادی یا دوبرابر)
+        $charge_amount = intval($Payment_report['price']);
+        if($double_charge) {
+            $charge_amount *= 2;
+        }
+        
+        $Balance_confrim = intval($Balance_id['Balance']) + $charge_amount;
         update("user","Balance",$Balance_confrim, "id",$Payment_report['id_user']);
         update("Payment_report","payment_Status","paid","id_order",$Payment_report['id_order']);
-        $Payment_report['price'] = number_format($Payment_report['price'], 0);
-        $format_price_cart = $Payment_report['price'];
+        
+        // ارسال پیام به کاربر
+        if($double_charge) {
+            $format_price_original = number_format($Payment_report['price'], 0);
+            $format_price_doubled = number_format($charge_amount, 0);
+            $textpay = "🎁 تبریک! شارژ دوبرابر\n✅ مبلغ {$format_price_original} تومان پرداخت کردید و {$format_price_doubled} تومان شارژ شد!\n🔰 شماره پیگیری: {$Payment_report['id_order']}";
+        } else {
+            $Payment_report['price'] = number_format($Payment_report['price'], 0);
+            $format_price_cart = $Payment_report['price'];
+            $textpay = sprintf($textbotlang['users']['moeny']['Charged.'],$Payment_report['price'],$Payment_report['id_order']);
+        }
+        
         if($Payment_report['Payment_Method'] == "cart to cart"){
             telegram('answerCallbackQuery', array(
                     'callback_query_id' => $callback_query_id,
@@ -402,7 +452,7 @@ function DirectPayment($order_id){
                 )
             );
         }
-        $textpay = sprintf($textbotlang['users']['moeny']['Charged.'],$Payment_report['price'],$Payment_report['id_order']);
+        
         sendmessage($Payment_report['id_user'], $textpay, null, 'HTML');
     }
 }

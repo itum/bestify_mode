@@ -172,7 +172,8 @@ try {
         namecustome varchar(100)  NULL,
         status_verify varchar(50)  NULL,
         removedayc varchar(100)  NULL,
-        statuscategory varchar(100)  NULL)
+        statuscategory varchar(100)  NULL,
+        double_charge_status varchar(50)  NULL)
         ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
         if (!$result) {
             echo "table setting".mysqli_error($connect);
@@ -182,13 +183,19 @@ try {
         $active_phone_text = "0";
         $active_phone_iran_text = "0";
         $active_help = "0";
-        $connect->query("INSERT INTO setting (Bot_Status,roll_Status,get_number,limit_usertest_all,time_usertest,val_usertest,help_Status,iran_number,NotUser,namecustome,removedayc,status_verify,statuscategory) VALUES ('$active_bot_text','$active_roll_text','$active_phone_text','1','1','100','$active_help','$active_phone_iran_text','0','0','1','0','1')");
+        $connect->query("INSERT INTO setting (Bot_Status,roll_Status,get_number,limit_usertest_all,time_usertest,val_usertest,help_Status,iran_number,NotUser,namecustome,removedayc,status_verify,statuscategory,double_charge_status) VALUES ('$active_bot_text','$active_roll_text','$active_phone_text','1','1','100','$active_help','$active_phone_iran_text','0','0','1','0','1','off')");
     } else {
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'status_verify'");
         if (mysqli_num_rows($Check_filde) != 1) {
             $connect->query("ALTER TABLE setting ADD status_verify VARCHAR(50)");
             $connect->query("UPDATE setting SET status_verify = '0'");
             echo "The status_verify field was added ✅";
+        }
+        $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'double_charge_status'");
+        if (mysqli_num_rows($Check_filde) != 1) {
+            $connect->query("ALTER TABLE setting ADD double_charge_status VARCHAR(50)");
+            $connect->query("UPDATE setting SET double_charge_status = 'off'");
+            echo "The double_charge_status field was added ✅";
         }
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'statuscategory'");
         if (mysqli_num_rows($Check_filde) != 1) {
@@ -758,6 +765,25 @@ try {
     file_put_contents('error_log',$e->getMessage());
 }
 $connect->query("ALTER TABLE `user` CHANGE `Processing_value` `Processing_value` TEXT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL;");
+
+//----------------------- [ double_charge_users ] --------------------- //
+try {
+    $result = $connect->query("SHOW TABLES LIKE 'double_charge_users'");
+    $table_exists = ($result->num_rows > 0);
+
+    if (!$table_exists) {
+        $result = $connect->query("CREATE TABLE double_charge_users (
+        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id varchar(500) NOT NULL,
+        used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
+        ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+        if (!$result) {
+            echo "table double_charge_users".mysqli_error($connect);
+        }
+    }
+} catch (Exception $e) {
+    file_put_contents('error_log',$e->getMessage());
+}
 
 //----------------------- [ Agency ] --------------------- //
 try {

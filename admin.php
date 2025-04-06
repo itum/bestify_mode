@@ -42,6 +42,25 @@ elseif ($text == "📣 تنظیم کانال جوین اجباری") {
         update("channels", "link", $text);
     }
 }
+elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
+    $setting = select("setting", "*");
+    $status = ($setting['double_charge_status'] == 'on') ? '✅ فعال' : '❌ غیرفعال';
+    $text_double_charge = "💎 مدیریت شارژ دوبرابر
+
+▫️ وضعیت فعلی: $status
+▫️ با این قابلیت، کاربرانی که حداقل 3 خرید از ربات داشته باشند می‌توانند یکبار از امکان شارژ دوبرابر استفاده کنند.
+▫️ کاربران نماینده مشمول این طرح نمی‌شوند.";
+    
+    sendmessage($from_id, $text_double_charge, $double_charge_keyboard, 'HTML');
+}
+elseif ($text == "✅ فعال کردن شارژ دوبرابر") {
+    update("setting", "double_charge_status", "on");
+    sendmessage($from_id, "✅ ویژگی شارژ دوبرابر با موفقیت فعال شد.", $setting_panel, 'HTML');
+}
+elseif ($text == "❌ غیرفعال کردن شارژ دوبرابر") {
+    update("setting", "double_charge_status", "off");
+    sendmessage($from_id, "❌ ویژگی شارژ دوبرابر با موفقیت غیرفعال شد.", $setting_panel, 'HTML');
+}
 if ($text == $textbotlang['Admin']['Addedadmin']) {
     sendmessage($from_id, $textbotlang['Admin']['manageadmin']['getid'], $backadmin, 'HTML');
     step('addadmin', $from_id);
@@ -3001,4 +3020,8 @@ if ($user['step'] == "edit_agency_discount") {
     // تایید به ادمین
     sendmessage($from_id, sprintf($textbotlang['Admin']['agency']['discount_changed'], $username, $discount_percent), $agencyManageKeyboard, 'HTML');
     update("user", "step", "none", "id", $from_id);
+}
+
+if ($text == $textbotlang['Admin']['keyboardadmin']['settings']) {
+    sendmessage($from_id, $textbotlang['users']['selectoption'], $setting_panel, 'HTML');
 }

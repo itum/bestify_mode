@@ -145,6 +145,14 @@ $setting_panel =  json_encode([
         [['text' => "🕚 تنظیمات کرون جاب"]],
         [['text' => '⚙️ وضعیت قابلیت ها']],
         [['text' => "📣 تنظیم کانال گزارش"], ['text' => "📯 تنظیمات کانال"]],
+        [['text' => "💸 تنظیمات شارژ دوبرابر"]],
+        [['text' => $textbotlang['Admin']['Back-Adminment']]]
+    ],
+    'resize_keyboard' => true
+]);
+$double_charge_keyboard = json_encode([
+    'keyboard' => [
+        [['text' => "✅ فعال کردن شارژ دوبرابر"], ['text' => "❌ غیرفعال کردن شارژ دوبرابر"]],
         [['text' => $textbotlang['Admin']['Back-Adminment']]]
     ],
     'resize_keyboard' => true
