@@ -52,7 +52,7 @@ if (intval($from_id) != 0) {
     }else{
         $verify = 1;
     }
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates,verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0', '0',:verify)");
+    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates,verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0',:verify)");
     $stmt->bindParam(':verify', $verify);
     $stmt->bindParam(':from_id', $from_id);
     $stmt->bindParam(':limit_usertest_all', $setting['limit_usertest_all']);
@@ -277,8 +277,46 @@ if ($text == $textbotlang['users']['backhome'] || $datain == "backuser") {
     update("user","Processing_value","0", "id",$from_id);
     update("user","Processing_value_one","0", "id",$from_id);
     update("user","Processing_value_tow","0", "id",$from_id);
-    if ($datain == "backuser")
-        deletemessage($from_id, $message_id);
+    
+    if ($datain == "backuser") {
+        // بررسی مرحله جاری کاربر
+        if ($user['step'] == 'getprice') {
+            // اگر کاربر در حال وارد کردن مبلغ دلخواه است، به منوی افزایش موجودی برگرد
+            $payment_markup = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '50,000 تومان', 'callback_data' => 'add_balance_50000'],
+                        ['text' => '75,000 تومان', 'callback_data' => 'add_balance_75000'],
+                    ],
+                    [
+                        ['text' => '100,000 تومان', 'callback_data' => 'add_balance_100000'],
+                        ['text' => '150,000 تومان', 'callback_data' => 'add_balance_150000'],
+                    ],
+                    [
+                        ['text' => '200,000 تومان', 'callback_data' => 'add_balance_200000'],
+                        ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
+                    ],
+                    [
+                        ['text' => '1,000,000 تومان', 'callback_data' => 'add_balance_1000000'],
+                    ],
+                    [
+                        ['text' => '🔢 مبلغ دلخواه', 'callback_data' => 'add_balance_custom'],
+                    ],
+                    [
+                        ['text' => 'بازگشت', 'callback_data' => 'backuser'],
+                    ]
+                ]
+            ]);
+            
+            $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
+            Editmessagetext($from_id, $message_id, $text, $payment_markup, 'HTML');
+            step('none', $from_id);
+            return;
+        } else {
+            deletemessage($from_id, $message_id);
+        }
+    }
+    
     sendmessage($from_id, $textbotlang['users']['back'], $keyboard, 'html');
     step('home', $from_id);
     return;
