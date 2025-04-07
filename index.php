@@ -2871,6 +2871,9 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     sendmessage($from_id, $text, $payment_markup, 'HTML');
     
 } elseif ($user['step'] == "getprice") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!is_numeric($text))
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorprice'], null, 'HTML');
     if ($text > 10000000 or $text < 5000)
@@ -4153,3 +4156,6 @@ elseif ($text == "/double_charge_setting") {
 ⏰ یادآوری به کاربران: ارسال یادآوری به کاربرانی که نزدیک به پایان مهلت هستند
 🧩 تنظیمات پیشرفته: سایر تنظیمات مربوط به کارکرد شارژ دوبرابر", $double_charge_keyboard, 'HTML');
 }
+
+// تابع convert_numbers_to_english به functions.php منتقل شده است
+// ... existing code ...

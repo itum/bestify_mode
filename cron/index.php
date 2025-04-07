@@ -2340,6 +2340,9 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     sendmessage($from_id, $textbotlang['users']['Balance']['priceinput'], $backuser, 'HTML');
     step('getprice', $from_id);
 } elseif ($user['step'] == "getprice") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!is_numeric($text))
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorprice'], null, 'HTML');
     if ($text > 10000000 or $text < 20000)
@@ -2840,3 +2843,5 @@ if ($text == $textbotlang['users']['agency']['request_button']) {
 }
 require_once 'admin.php';
 $connect->close();
+
+// تابع convert_numbers_to_english به functions.php منتقل شده است

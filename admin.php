@@ -797,6 +797,9 @@ if ($text == "🏬 بخش فروشگاه") {
     sendmessage($from_id, $textbotlang['Admin']['Product']['GettIime'], $backadmin, 'HTML');
     step('get_price', $from_id);
 } elseif ($user['step'] == "get_price") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['InvalidTime'], $backadmin, 'HTML');
         return;
@@ -805,6 +808,9 @@ if ($text == "🏬 بخش فروشگاه") {
     sendmessage($from_id, $textbotlang['Admin']['Product']['GetPrice'], $backadmin, 'HTML');
     step('endstep', $from_id);
 } elseif ($user['step'] == "endstep") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['InvalidPrice'], $backadmin, 'HTML');
         return;
@@ -926,6 +932,9 @@ if ($text == "قیمت") {
     sendmessage($from_id, "قیمت جدید را ارسال کنید", $backadmin, 'HTML');
     step('change_price', $from_id);
 } elseif ($user['step'] == "change_price") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['InvalidPrice'], $backadmin, 'HTML');
         return;
@@ -973,6 +982,9 @@ if ($text == "حجم") {
     sendmessage($from_id, "حجم جدید را ارسال کنید", $backadmin, 'HTML');
     step('change_val', $from_id);
 } elseif ($user['step'] == "change_val") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['Invalidvolume'], $backadmin, 'HTML');
         return;
@@ -991,6 +1003,9 @@ if ($text == "زمان") {
     sendmessage($from_id, $textbotlang['Admin']['Product']['NewTime'], $backadmin, 'HTML');
     step('change_time', $from_id);
 } elseif ($user['step'] == "change_time") {
+    // تبدیل اعداد عربی و فارسی به انگلیسی
+    $text = convert_numbers_to_english($text);
+    
     if (!ctype_digit($text)) {
         sendmessage($from_id, $textbotlang['Admin']['Product']['InvalidTime'], $backadmin, 'HTML');
         return;
@@ -3582,3 +3597,6 @@ crontab -e
         step('none', $from_id);
     }
 }
+
+
+// تابع convert_numbers_to_english به functions.php منتقل شده است
