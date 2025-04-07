@@ -518,8 +518,8 @@ function DirectPayment($order_id){
             $format_price_doubled = number_format($charge_amount, 0);
             $textpay = "🎁 تبریک! شارژ دوبرابر\n✅ مبلغ {$format_price_original} تومان پرداخت کردید و {$format_price_doubled} تومان شارژ شد!\n🔰 شماره پیگیری: {$Payment_report['id_order']}";
         } else {
-            $Payment_report['price'] = number_format($Payment_report['price'], 0);
-            $format_price_cart = $Payment_report['price'];
+        $Payment_report['price'] = number_format($Payment_report['price'], 0);
+        $format_price_cart = $Payment_report['price'];
             $textpay = sprintf($textbotlang['users']['moeny']['Charged.'],$Payment_report['price'],$Payment_report['id_order']);
         }
         

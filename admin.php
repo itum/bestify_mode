@@ -47,9 +47,6 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
     $status = ($setting['double_charge_status'] == 'on') ? '✅ فعال' : '❌ غیرفعال';
     $min_purchase = $setting['double_charge_min_purchase'];
     
-    // بررسی وجود فیلد مهلت زمانی
-    $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
-    
     $purchase_guide = "";
     if ($min_purchase == 0) {
         $purchase_guide = "تمامی کاربران (هیچ محدودیتی برای حداقل خرید وجود ندارد)";
@@ -61,7 +58,6 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
 
 ▫️ وضعیت فعلی: $status
 ▫️ حداقل تعداد خرید لازم: $purchase_guide
-▫️ مهلت استفاده از طرح: $expiry_hours ساعت
 ▫️ توضیحات: با این قابلیت، کاربرانی که به حد نصاب خرید رسیده باشند می‌توانند یکبار از امکان شارژ دوبرابر استفاده کنند.
 ▫️ کاربران نماینده مشمول این طرح نمی‌شوند.
 ▫️ راهنما: برای تغییر حداقل تعداد خرید مورد نیاز، از دکمه زیر استفاده کنید. اگر مقدار 0 را وارد کنید، تمامی کاربران بدون محدودیت می‌توانند از این ویژگی استفاده کنند.";
@@ -69,8 +65,9 @@ elseif ($text == "💸 تنظیمات شارژ دوبرابر") {
     $double_charge_keyboard = json_encode([
         'keyboard' => [
             [['text' => "✅ فعال کردن شارژ دوبرابر"], ['text' => "❌ غیرفعال کردن شارژ دوبرابر"]],
-            [['text' => "🔢 تنظیم حداقل تعداد خرید"], ['text' => "⏱ تنظیم مهلت استفاده"]],
+            [['text' => "🔢 تنظیم حداقل تعداد خرید"]],
             [['text' => "📋 لیست کاربران مشمول شارژ دوبرابر"]],
+            [['text' => "⏰ یادآوری به کاربران نزدیک به پایان مهلت"]],
             [['text' => $textbotlang['Admin']['Back-Adminment']]]
         ],
         'resize_keyboard' => true
@@ -3285,7 +3282,6 @@ elseif ($user['step'] == "notify_double_charge_users") {
         step('none', $from_id);
     }
 }
-
 // اضافه کردن بخش تنظیم مهلت استفاده
 elseif ($text == "⏱ تنظیم مهلت استفاده") {
     $setting = select("setting", "*");
@@ -3320,6 +3316,393 @@ elseif ($user['step'] == "set_double_charge_expiry") {
         step('none', $from_id);
     } catch (PDOException $e) {
         sendmessage($from_id, "❌ خطا در بروزرسانی تنظیمات: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+        step('none', $from_id);
+    }
+}
+
+// اضافه کردن بخش یادآوری به کاربران نزدیک به پایان مهلت
+elseif ($text == "⏰ یادآوری به کاربران نزدیک به پایان مهلت") {
+    try {
+        // بررسی وجود جدول double_charge_notifications
+        $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+        
+        if ($check_table && $check_table->rowCount() == 0) {
+            // ایجاد جدول اگر وجود نداشته باشد
+            $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
+                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id varchar(500) NOT NULL,
+                notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                expiry_hours INT(11) NOT NULL,
+                UNIQUE KEY unique_user_id (user_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+            
+            sendmessage($from_id, "❌ هیچ کاربری برای یادآوری وجود ندارد. ابتدا باید به کاربران اطلاع‌رسانی کنید.", $double_charge_keyboard, 'HTML');
+            return;
+        }
+        
+        $reminder_options = json_encode([
+            'keyboard' => [
+                [['text' => "📤 ارسال دستی یادآوری"]],
+                [['text' => "⚙️ ساخت فایل کرون جاب برای ارسال خودکار"]],
+                [['text' => $textbotlang['Admin']['Back-Adminment']]]
+            ],
+            'resize_keyboard' => true
+        ]);
+        
+        sendmessage($from_id, "📣 سیستم یادآوری شارژ دوبرابر
+
+لطفاً نحوه ارسال یادآوری به کاربران را انتخاب کنید:
+
+📤 ارسال دستی: بررسی کاربران نزدیک به پایان مهلت و ارسال پیام یادآوری به آنها در همین لحظه
+
+⚙️ ساخت فایل کرون جاب: ایجاد یک فایل PHP که می‌توانید آن را در سرور خود به عنوان کرون جاب تنظیم کنید تا به صورت خودکار هر روز اجرا شود و به کاربرانی که مهلت آنها کمتر از 12 ساعت مانده یادآوری ارسال کند.", $reminder_options, 'HTML');
+        
+        step('double_charge_reminder_option', $from_id);
+        return;
+    } catch (PDOException $e) {
+        sendmessage($from_id, "❌ خطا در بررسی جدول: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+    }
+}
+
+elseif ($user['step'] == "double_charge_reminder_option") {
+    if ($text == "📤 ارسال دستی یادآوری") {
+        try {
+            $current_time = time();
+            $reminder_limit = 12 * 3600; // 12 ساعت به ثانیه
+            $count = 0;
+            $success = 0;
+            
+            // پیدا کردن کاربرانی که مهلت آنها کمتر از 12 ساعت باقی مانده
+            $stmt = $pdo->prepare("
+                SELECT n.*, u.username 
+                FROM double_charge_notifications n
+                JOIN user u ON n.user_id = u.id
+                WHERE UNIX_TIMESTAMP(n.expiry_at) - ? <= ?
+                AND UNIX_TIMESTAMP(n.expiry_at) > ?
+            ");
+            
+            $stmt->execute([$current_time, $reminder_limit, $current_time]);
+            $users_to_remind = $stmt->fetchAll(PDO::FETCH_ASSOC);
+            
+            if (count($users_to_remind) == 0) {
+                sendmessage($from_id, "❌ هیچ کاربری نزدیک به پایان مهلت استفاده از شارژ دوبرابر نیست.", $double_charge_keyboard, 'HTML');
+                step('none', $from_id);
+                return;
+            }
+            
+            // ارسال پیام یادآوری به کاربران
+            foreach ($users_to_remind as $user) {
+                $count++;
+                $user_id = $user['user_id'];
+                $username = !empty($user['username']) ? $user['username'] : 'کاربر';
+                $expiry_at = strtotime($user['expiry_at']);
+                $remaining_hours = round(($expiry_at - $current_time) / 3600, 1);
+                
+                // بررسی اینکه کاربر استفاده نکرده باشد
+                $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                $stmt->bindParam(':user_id', $user_id);
+                $stmt->execute();
+                
+                if ($stmt->rowCount() == 0) { // کاربر هنوز استفاده نکرده
+                    // پیام یادآوری
+                    $reminder_message = "⚠️ {$username} عزیز هنوز از فرصت شارژ دوبرابر استفاده نکرده‌اید!
+
+⏰ تنها {$remaining_hours} ساعت از مهلت استفاده شما باقی مانده است!
+
+💰 با استفاده از این فرصت استثنایی، می‌توانید یک‌بار حساب خود را با هر مبلغی شارژ کنید و دو برابر آن را دریافت نمایید!
+
+🔴 توجه: این فرصت فقط یک‌بار قابل استفاده است و پس از پایان مهلت، تکرار نخواهد شد.
+
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
+
+🚀 عجله کنید!";
+                    
+                    // ارسال پیام به کاربر
+                    $result = telegram('sendMessage', [
+                        'chat_id' => $user_id,
+                        'text' => $reminder_message,
+                        'parse_mode' => 'HTML'
+                    ]);
+                    
+                    if (isset($result['ok']) && $result['ok']) {
+                        $success++;
+                    }
+                    
+                    // کمی صبر برای جلوگیری از محدودیت تلگرام
+                    sleep(1);
+                }
+            }
+            
+            if ($success > 0) {
+                sendmessage($from_id, "✅ یادآوری با موفقیت انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل کاربران نزدیک به پایان مهلت: $count\n▪️ یادآوری‌های ارسال شده: $success\n▪️ ارسال ناموفق: " . ($count - $success), $double_charge_keyboard, 'HTML');
+            } else {
+                sendmessage($from_id, "❌ هیچ یادآوری‌ای ارسال نشد. احتمالاً همه کاربران قبلاً از شارژ دوبرابر استفاده کرده‌اند.", $double_charge_keyboard, 'HTML');
+            }
+            
+            step('none', $from_id);
+            
+        } catch (PDOException $e) {
+            sendmessage($from_id, "❌ خطا در بررسی و ارسال یادآوری: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+            step('none', $from_id);
+        }
+    } 
+    elseif ($text == "⚙️ ساخت فایل کرون جاب برای ارسال خودکار") {
+        try {
+            // ایجاد فایل کرون جاب
+            $cron_file_content = '<?php
+// فایل کرون جاب برای ارسال خودکار یادآوری به کاربران نزدیک به پایان مهلت شارژ دوبرابر
+// این فایل را باید به عنوان کرون جاب در سرور خود تنظیم کنید تا هر روز یکبار اجرا شود
+
+require_once "config.php";
+require_once "vendor/autoload.php";
+require_once "functions.php";
+
+// تنظیم محدودیت زمانی اجرای اسکریپت (به ثانیه)
+set_time_limit(3600); // 1 ساعت
+
+// فایل لاگ
+$log_file = "cron_double_charge_reminder.log";
+file_put_contents($log_file, "=== شروع اجرای کرون جاب یادآوری شارژ دوبرابر در " . date("Y-m-d H:i:s") . " ===\n", FILE_APPEND);
+
+try {
+    $current_time = time();
+    $reminder_limit = 12 * 3600; // 12 ساعت به ثانیه
+    $count = 0;
+    $success = 0;
+    $queue_file = "double_charge_reminder_queue.txt";
+    
+    // پیدا کردن کاربرانی که مهلت آنها کمتر از 12 ساعت باقی مانده
+    $stmt = $pdo->prepare("
+        SELECT n.*, u.username 
+        FROM double_charge_notifications n
+        JOIN user u ON n.user_id = u.id
+        WHERE UNIX_TIMESTAMP(n.expiry_at) - ? <= ?
+        AND UNIX_TIMESTAMP(n.expiry_at) > ?
+    ");
+    
+    $stmt->execute([$current_time, $reminder_limit, $current_time]);
+    $users_to_remind = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    $total_users = count($users_to_remind);
+    
+    file_put_contents($log_file, "تعداد کاربران نزدیک به پایان مهلت: " . $total_users . "\n", FILE_APPEND);
+    
+    if ($total_users == 0) {
+        file_put_contents($log_file, "هیچ کاربری نزدیک به پایان مهلت نیست. پایان اجرا.\n", FILE_APPEND);
+        exit;
+    }
+    
+    // ایجاد صف ارسال
+    $queue = [];
+    foreach ($users_to_remind as $user) {
+        $user_id = $user["user_id"];
+        $username = !empty($user["username"]) ? $user["username"] : "کاربر";
+        $expiry_at = strtotime($user["expiry_at"]);
+        $remaining_hours = round(($expiry_at - $current_time) / 3600, 1);
+        
+        // بررسی اینکه کاربر استفاده نکرده باشد
+        $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+        $stmt->bindParam(":user_id", $user_id);
+        $stmt->execute();
+        
+        if ($stmt->rowCount() == 0) { // کاربر هنوز استفاده نکرده
+            // پیام یادآوری
+            $reminder_message = "⚠️ {$username} عزیز هنوز از فرصت شارژ دوبرابر استفاده نکرده‌اید!
+
+⏰ تنها {$remaining_hours} ساعت از مهلت استفاده شما باقی مانده است!
+
+💰 با استفاده از این فرصت استثنایی، می‌توانید یک‌بار حساب خود را با هر مبلغی شارژ کنید و دو برابر آن را دریافت نمایید!
+
+🔴 توجه: این فرصت فقط یک‌بار قابل استفاده است و پس از پایان مهلت، تکرار نخواهد شد.
+
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
+
+🚀 عجله کنید!";
+            
+            // افزودن به صف
+            $queue[] = [
+                "user_id" => $user_id,
+                "username" => $username,
+                "message" => $reminder_message,
+                "remaining_hours" => $remaining_hours
+            ];
+            $count++;
+        } else {
+            file_put_contents($log_file, "⚠️ کاربر {$user_id} قبلاً از شارژ دوبرابر استفاده کرده است.\n", FILE_APPEND);
+        }
+    }
+    
+    // ذخیره صف به فایل
+    file_put_contents($queue_file, json_encode($queue));
+    file_put_contents($log_file, "تعداد کاربران در صف ارسال: {$count}\n", FILE_APPEND);
+    
+    // ارسال پیام‌ها با استفاده از shell_exec
+    if ($count > 0) {
+        $send_command = \'php -r "
+            // نمایش درصد
+            function showProgress($current, $total) {
+                $percent = round(($current / $total) * 100);
+                echo \\"\\\\r[";
+                $progress_bar_length = 50;
+                $filled = floor($progress_bar_length * $current / $total);
+                for ($i = 0; $i < $progress_bar_length; $i++) {
+                    if ($i < $filled) {
+                        echo \\"#\\";
+                    } else {
+                        echo \\"-\\";
+                    }
+                }
+                echo \\"] {$percent}% ({$current}/{$total})\\";
+                if ($current >= $total) {
+                    echo \\"\\\\n\\";
+                }
+                flush();
+            }
+            
+            $log_file = \\"cron_double_charge_reminder.log\\";
+            $queue_file = \\"double_charge_reminder_queue.txt\\";
+            $queue = json_decode(file_get_contents($queue_file), true);
+            $total = count($queue);
+            $success = 0;
+            
+            echo \\"🔄 شروع ارسال یادآوری به {$total} کاربر...\\\\n\\";
+            
+            for ($i = 0; $i < $total; $i++) {
+                $item = $queue[$i];
+                $user_id = $item[\\"user_id\\"];
+                $username = $item[\\"username\\"];
+                $message = $item[\\"message\\"];
+                $remaining_hours = $item[\\"remaining_hours\\"];
+                
+                // ارسال پیام به کاربر
+                $url = \\"https://api.telegram.org/bot{$GLOBALS[\\"botToken\\"]}/sendMessage\\";
+                $params = [
+                    \\"chat_id\\" => $user_id,
+                    \\"text\\" => $message,
+                    \\"parse_mode\\" => \\"HTML\\"
+                ];
+                
+                $ch = curl_init();
+                curl_setopt($ch, CURLOPT_URL, $url);
+                curl_setopt($ch, CURLOPT_POST, 1);
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
+                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+                $result = curl_exec($ch);
+                curl_close($ch);
+                
+                $response = json_decode($result, true);
+                
+                if (isset($response[\\"ok\\"]) && $response[\\"ok\\"]) {
+                    $success++;
+                    file_put_contents($log_file, \\"✅ یادآوری با موفقیت به کاربر {$user_id} ({$username}) ارسال شد. مهلت باقیمانده: {$remaining_hours} ساعت\\\\n\\", FILE_APPEND);
+                } else {
+                    file_put_contents($log_file, \\"❌ خطا در ارسال یادآوری به کاربر {$user_id}: \\" . json_encode($response) . \\"\\\\n\\", FILE_APPEND);
+                }
+                
+                // نمایش درصد پیشرفت
+                showProgress($i + 1, $total);
+                
+                // کمی صبر برای جلوگیری از محدودیت تلگرام
+                sleep(1);
+            }
+            
+            echo \\"\\\\n✅ عملیات ارسال به اتمام رسید.\\\\n\\";
+            echo \\"📊 آمار: کل کاربران: {$total} | ارسال موفق: {$success} | ارسال ناموفق: \\" . ($total - $success) . \\"\\\\n\\";
+            
+            // پاکسازی فایل صف
+            unlink($queue_file);
+            
+            file_put_contents($log_file, \\"=== پایان اجرای کرون جاب یادآوری شارژ دوبرابر ===\\\\n\\", FILE_APPEND);
+            file_put_contents($log_file, \\"📊 آمار: کل کاربران: {$total} | ارسال موفق: {$success} | ارسال ناموفق: \\" . ($total - $success) . \\"\\\\n\\\\n\\", FILE_APPEND);
+        "\';
+        
+        $php_execution = \'#!/bin/bash
+
+# رنگ‌های ANSI برای خروجی زیباتر
+GREEN="\\\033[0;32m"
+YELLOW="\\\033[1;33m"
+RED="\\\033[0;31m"
+NC="\\\033[0m" # No Color
+
+echo -e "${YELLOW}شروع ارسال یادآوری شارژ دوبرابر به کاربران...${NC}"
+echo "زمان شروع: $(date)"
+
+# فراخوانی اسکریپت PHP
+php -r \' . $send_command . \'
+
+# بررسی موفقیت آمیز بودن اجرا
+if [ $? -eq 0 ]; then
+    echo -e "${GREEN}✅ ارسال یادآوری با موفقیت انجام شد.${NC}"
+else
+    echo -e "${RED}❌ خطا در ارسال یادآوری.${NC}"
+fi
+
+echo "زمان پایان: $(date)"
+\';
+        
+        // نوشتن اسکریپت باش به فایل
+        $bash_file_path = "double_charge_reminder.sh";
+        file_put_contents($bash_file_path, $php_execution);
+        chmod($bash_file_path, 0755); // اعطای دسترسی اجرا
+        
+        // اسکریپت اصلی کرون
+        $cron_file_content .= \'
+// برای اجرای اسکریپت صف‌بندی شده می‌توانید از shell_exec استفاده کنید
+$output = shell_exec(\'./double_charge_reminder.sh 2>&1\');
+file_put_contents($log_file, "خروجی اجرای اسکریپت صف‌بندی شده:\\n" . $output . "\\n", FILE_APPEND);
+
+} catch (Exception $e) {
+    file_put_contents($log_file, "❌❌❌ خطای کرون جاب: " . $e->getMessage() . "\\n", FILE_APPEND);
+}
+\';
+
+            // نوشتن محتوا در فایل
+            $cron_file_path = 'cron_double_charge_reminder.php';
+            file_put_contents($cron_file_path, $cron_file_content);
+            
+            $instructions = "✅ فایل کرون جاب با موفقیت ایجاد شد!
+
+📋 **دستورالعمل‌های نصب**:
+
+1. دو فایل در مسیر اصلی بات ایجاد شده است:
+   - `cron_double_charge_reminder.php`: فایل اصلی کرون جاب
+   - `double_charge_reminder.sh`: اسکریپت صف‌بندی شده برای ارسال پیام‌ها
+
+2. به فایل باش دسترسی اجرا داده شده است، اما اگر در سرور اجرا نشد، دستور زیر را اجرا کنید:
+```
+chmod +x double_charge_reminder.sh
+```
+
+3. برای تنظیم کرون جاب در سرور لینوکس:
+```
+0 8 * * * cd /path/to/bot && php cron_double_charge_reminder.php >> cron_output.log 2>&1
+```
+این دستور هر روز ساعت 8 صبح اجرا می‌شود. می‌توانید زمان را تغییر دهید.
+
+4. برای اضافه کردن کرون جاب:
+```
+crontab -e
+```
+سپس دستور بالا را اضافه کنید و ذخیره نمایید.
+
+5. ویژگی‌های این نسخه:
+   - صف‌بندی پیام‌ها برای ارسال بهینه
+   - نمایش درصد پیشرفت ارسال پیام‌ها
+   - مدیریت خطاها و گزارش‌دهی دقیق
+   - ثبت کامل نتایج در فایل لاگ
+
+این کرون جاب به صورت خودکار به کاربرانی که مهلت استفاده از شارژ دوبرابر آنها کمتر از 12 ساعت باقی مانده است، پیام یادآوری ارسال می‌کند.";
+
+            sendmessage($from_id, $instructions, $double_charge_keyboard, 'HTML');
+            step('none', $from_id);
+            
+        } catch (Exception $e) {
+            sendmessage($from_id, "❌ خطا در ایجاد فایل کرون جاب: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+            step('none', $from_id);
+        }
+    }
+    else {
+        sendmessage($from_id, "به منوی مدیریت بازگشتید.", $double_charge_keyboard, 'HTML');
         step('none', $from_id);
     }
 }

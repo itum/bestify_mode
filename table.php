@@ -204,12 +204,6 @@ try {
             $connect->query("UPDATE setting SET double_charge_min_purchase = '3'");
             echo "The double_charge_min_purchase field was added ✅";
         }
-        $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'double_charge_expiry_hours'");
-        if (mysqli_num_rows($Check_filde) != 1) {
-            $connect->query("ALTER TABLE setting ADD double_charge_expiry_hours INT(11) DEFAULT 72");
-            $connect->query("UPDATE setting SET double_charge_expiry_hours = '72'");
-            echo "The double_charge_expiry_hours field was added ✅";
-        }
         $Check_filde = $connect->query("SHOW COLUMNS FROM setting LIKE 'statuscategory'");
         if (mysqli_num_rows($Check_filde) != 1) {
             $connect->query("ALTER TABLE setting ADD statuscategory VARCHAR(50)");
