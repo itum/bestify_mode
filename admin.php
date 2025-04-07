@@ -3458,19 +3458,15 @@ require_once "config.php";
 require_once "vendor/autoload.php";
 require_once "functions.php";
 
-// تنظیم محدودیت زمانی اجرای اسکریپت (به ثانیه)
-set_time_limit(3600); // 1 ساعت
-
-// فایل لاگ
-$log_file = "cron_double_charge_reminder.log";
-file_put_contents($log_file, "=== شروع اجرای کرون جاب یادآوری شارژ دوبرابر در " . date("Y-m-d H:i:s") . " ===\n", FILE_APPEND);
-
 try {
     $current_time = time();
     $reminder_limit = 12 * 3600; // 12 ساعت به ثانیه
     $count = 0;
     $success = 0;
-    $queue_file = "double_charge_reminder_queue.txt";
+    
+    // لاگ فایل
+    $log_file = "cron_double_charge_reminder.log";
+    file_put_contents($log_file, "=== شروع اجرای کرون جاب یادآوری شارژ دوبرابر در " . date("Y-m-d H:i:s") . " ===\n", FILE_APPEND);
     
     // پیدا کردن کاربرانی که مهلت آنها کمتر از 12 ساعت باقی مانده
     $stmt = $pdo->prepare("
@@ -3483,18 +3479,17 @@ try {
     
     $stmt->execute([$current_time, $reminder_limit, $current_time]);
     $users_to_remind = $stmt->fetchAll(PDO::FETCH_ASSOC);
-    $total_users = count($users_to_remind);
     
-    file_put_contents($log_file, "تعداد کاربران نزدیک به پایان مهلت: " . $total_users . "\n", FILE_APPEND);
+    file_put_contents($log_file, "تعداد کاربران نزدیک به پایان مهلت: " . count($users_to_remind) . "\n", FILE_APPEND);
     
-    if ($total_users == 0) {
+    if (count($users_to_remind) == 0) {
         file_put_contents($log_file, "هیچ کاربری نزدیک به پایان مهلت نیست. پایان اجرا.\n", FILE_APPEND);
         exit;
     }
     
-    // ایجاد صف ارسال
-    $queue = [];
+    // ارسال پیام یادآوری به کاربران
     foreach ($users_to_remind as $user) {
+        $count++;
         $user_id = $user["user_id"];
         $username = !empty($user["username"]) ? $user["username"] : "کاربر";
         $expiry_at = strtotime($user["expiry_at"]);
@@ -3519,142 +3514,34 @@ try {
 
 🚀 عجله کنید!";
             
-            // افزودن به صف
-            $queue[] = [
-                "user_id" => $user_id,
-                "username" => $username,
-                "message" => $reminder_message,
-                "remaining_hours" => $remaining_hours
-            ];
-            $count++;
+            // ارسال پیام به کاربر
+            $result = telegram("sendMessage", [
+                "chat_id" => $user_id,
+                "text" => $reminder_message,
+                "parse_mode" => "HTML"
+            ]);
+            
+            if (isset($result["ok"]) && $result["ok"]) {
+                $success++;
+                file_put_contents($log_file, "✅ یادآوری با موفقیت به کاربر {$user_id} ({$username}) ارسال شد. مهلت باقیمانده: {$remaining_hours} ساعت\n", FILE_APPEND);
+            } else {
+                file_put_contents($log_file, "❌ خطا در ارسال یادآوری به کاربر {$user_id}: " . json_encode($result) . "\n", FILE_APPEND);
+            }
+            
+            // کمی صبر برای جلوگیری از محدودیت تلگرام
+            sleep(1);
         } else {
             file_put_contents($log_file, "⚠️ کاربر {$user_id} قبلاً از شارژ دوبرابر استفاده کرده است.\n", FILE_APPEND);
         }
     }
     
-    // ذخیره صف به فایل
-    file_put_contents($queue_file, json_encode($queue));
-    file_put_contents($log_file, "تعداد کاربران در صف ارسال: {$count}\n", FILE_APPEND);
+    file_put_contents($log_file, "=== پایان اجرای کرون جاب یادآوری شارژ دوبرابر ===\n", FILE_APPEND);
+    file_put_contents($log_file, "📊 آمار: کل کاربران: {$count} | ارسال موفق: {$success} | ارسال ناموفق: " . ($count - $success) . "\n\n", FILE_APPEND);
     
-    // ارسال پیام‌ها با استفاده از shell_exec
-    if ($count > 0) {
-        $send_command = \'php -r "
-            // نمایش درصد
-            function showProgress($current, $total) {
-                $percent = round(($current / $total) * 100);
-                echo \\"\\\\r[";
-                $progress_bar_length = 50;
-                $filled = floor($progress_bar_length * $current / $total);
-                for ($i = 0; $i < $progress_bar_length; $i++) {
-                    if ($i < $filled) {
-                        echo \\"#\\";
-                    } else {
-                        echo \\"-\\";
-                    }
-                }
-                echo \\"] {$percent}% ({$current}/{$total})\\";
-                if ($current >= $total) {
-                    echo \\"\\\\n\\";
-                }
-                flush();
-            }
-            
-            $log_file = \\"cron_double_charge_reminder.log\\";
-            $queue_file = \\"double_charge_reminder_queue.txt\\";
-            $queue = json_decode(file_get_contents($queue_file), true);
-            $total = count($queue);
-            $success = 0;
-            
-            echo \\"🔄 شروع ارسال یادآوری به {$total} کاربر...\\\\n\\";
-            
-            for ($i = 0; $i < $total; $i++) {
-                $item = $queue[$i];
-                $user_id = $item[\\"user_id\\"];
-                $username = $item[\\"username\\"];
-                $message = $item[\\"message\\"];
-                $remaining_hours = $item[\\"remaining_hours\\"];
-                
-                // ارسال پیام به کاربر
-                $url = \\"https://api.telegram.org/bot{$GLOBALS[\\"botToken\\"]}/sendMessage\\";
-                $params = [
-                    \\"chat_id\\" => $user_id,
-                    \\"text\\" => $message,
-                    \\"parse_mode\\" => \\"HTML\\"
-                ];
-                
-                $ch = curl_init();
-                curl_setopt($ch, CURLOPT_URL, $url);
-                curl_setopt($ch, CURLOPT_POST, 1);
-                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($params));
-                curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-                $result = curl_exec($ch);
-                curl_close($ch);
-                
-                $response = json_decode($result, true);
-                
-                if (isset($response[\\"ok\\"]) && $response[\\"ok\\"]) {
-                    $success++;
-                    file_put_contents($log_file, \\"✅ یادآوری با موفقیت به کاربر {$user_id} ({$username}) ارسال شد. مهلت باقیمانده: {$remaining_hours} ساعت\\\\n\\", FILE_APPEND);
-                } else {
-                    file_put_contents($log_file, \\"❌ خطا در ارسال یادآوری به کاربر {$user_id}: \\" . json_encode($response) . \\"\\\\n\\", FILE_APPEND);
-                }
-                
-                // نمایش درصد پیشرفت
-                showProgress($i + 1, $total);
-                
-                // کمی صبر برای جلوگیری از محدودیت تلگرام
-                sleep(1);
-            }
-            
-            echo \\"\\\\n✅ عملیات ارسال به اتمام رسید.\\\\n\\";
-            echo \\"📊 آمار: کل کاربران: {$total} | ارسال موفق: {$success} | ارسال ناموفق: \\" . ($total - $success) . \\"\\\\n\\";
-            
-            // پاکسازی فایل صف
-            unlink($queue_file);
-            
-            file_put_contents($log_file, \\"=== پایان اجرای کرون جاب یادآوری شارژ دوبرابر ===\\\\n\\", FILE_APPEND);
-            file_put_contents($log_file, \\"📊 آمار: کل کاربران: {$total} | ارسال موفق: {$success} | ارسال ناموفق: \\" . ($total - $success) . \\"\\\\n\\\\n\\", FILE_APPEND);
-        "\';
-        
-        $php_execution = \'#!/bin/bash
-
-# رنگ‌های ANSI برای خروجی زیباتر
-GREEN="\\\033[0;32m"
-YELLOW="\\\033[1;33m"
-RED="\\\033[0;31m"
-NC="\\\033[0m" # No Color
-
-echo -e "${YELLOW}شروع ارسال یادآوری شارژ دوبرابر به کاربران...${NC}"
-echo "زمان شروع: $(date)"
-
-# فراخوانی اسکریپت PHP
-php -r \' . $send_command . \'
-
-# بررسی موفقیت آمیز بودن اجرا
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✅ ارسال یادآوری با موفقیت انجام شد.${NC}"
-else
-    echo -e "${RED}❌ خطا در ارسال یادآوری.${NC}"
-fi
-
-echo "زمان پایان: $(date)"
-\';
-        
-        // نوشتن اسکریپت باش به فایل
-        $bash_file_path = "double_charge_reminder.sh";
-        file_put_contents($bash_file_path, $php_execution);
-        chmod($bash_file_path, 0755); // اعطای دسترسی اجرا
-        
-        // اسکریپت اصلی کرون
-        $cron_file_content .= \'
-// برای اجرای اسکریپت صف‌بندی شده می‌توانید از shell_exec استفاده کنید
-$output = shell_exec(\'./double_charge_reminder.sh 2>&1\');
-file_put_contents($log_file, "خروجی اجرای اسکریپت صف‌بندی شده:\\n" . $output . "\\n", FILE_APPEND);
-
 } catch (Exception $e) {
-    file_put_contents($log_file, "❌❌❌ خطای کرون جاب: " . $e->getMessage() . "\\n", FILE_APPEND);
+    file_put_contents($log_file, "❌❌❌ خطای کرون جاب: " . $e->getMessage() . "\n", FILE_APPEND);
 }
-\';
+';
 
             // نوشتن محتوا در فایل
             $cron_file_path = 'cron_double_charge_reminder.php';
@@ -3664,32 +3551,21 @@ file_put_contents($log_file, "خروجی اجرای اسکریپت صف‌بند
 
 📋 **دستورالعمل‌های نصب**:
 
-1. دو فایل در مسیر اصلی بات ایجاد شده است:
-   - `cron_double_charge_reminder.php`: فایل اصلی کرون جاب
-   - `double_charge_reminder.sh`: اسکریپت صف‌بندی شده برای ارسال پیام‌ها
+1. فایل `cron_double_charge_reminder.php` در مسیر اصلی بات ایجاد شده است.
 
-2. به فایل باش دسترسی اجرا داده شده است، اما اگر در سرور اجرا نشد، دستور زیر را اجرا کنید:
+2. برای تنظیم کرون جاب در سرور لینوکس، می‌توانید از دستور زیر استفاده کنید:
 ```
-chmod +x double_charge_reminder.sh
-```
-
-3. برای تنظیم کرون جاب در سرور لینوکس:
-```
-0 8 * * * cd /path/to/bot && php cron_double_charge_reminder.php >> cron_output.log 2>&1
+0 8 * * * cd /path/to/bot && php cron_double_charge_reminder.php
 ```
 این دستور هر روز ساعت 8 صبح اجرا می‌شود. می‌توانید زمان را تغییر دهید.
 
-4. برای اضافه کردن کرون جاب:
+3. برای اضافه کردن کرون جاب:
 ```
 crontab -e
 ```
 سپس دستور بالا را اضافه کنید و ذخیره نمایید.
 
-5. ویژگی‌های این نسخه:
-   - صف‌بندی پیام‌ها برای ارسال بهینه
-   - نمایش درصد پیشرفت ارسال پیام‌ها
-   - مدیریت خطاها و گزارش‌دهی دقیق
-   - ثبت کامل نتایج در فایل لاگ
+4. نتایج اجرای کرون جاب در فایل `cron_double_charge_reminder.log` ذخیره می‌شود.
 
 این کرون جاب به صورت خودکار به کاربرانی که مهلت استفاده از شارژ دوبرابر آنها کمتر از 12 ساعت باقی مانده است، پیام یادآوری ارسال می‌کند.";
 
