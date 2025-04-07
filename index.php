@@ -1982,15 +1982,23 @@ if ($text == $datatextbot['text_account']) {
     $userinfo = select("user", "*", "id", $from_id, "select");
     $userbalance = number_format($userinfo['Balance'], 0);
     $userdoublebalance = number_format($userinfo['double_charge_balance'], 0);
-    $formatted_text = sprintf($textbotlang['users']['account'],
-        $first_name,
-        $from_id,
-        $userbalance,
-        $userdoublebalance,
-        $user_count_service,
-        $userinfo['affiliatescount'],
-        $datecc,
-        $timecc);
+    
+    // متن پایه حساب کاربری
+    $account_text = "
+👨‍💼 نام کاربری : $first_name
+🔑 آیدی عددی : $from_id
+💰 موجودی : $userbalance تومان";
+    
+    // اضافه کردن موجودی شارژ دوبرابر فقط اگر بیشتر از صفر باشد
+    if ($userinfo['double_charge_balance'] > 0) {
+        $account_text .= "\n💎 موجودی شارژ دوبرابر: $userdoublebalance تومان";
+    }
+    
+    // ادامه متن حساب کاربری
+    $account_text .= "\n📊 خرید های شما : $user_count_service
+👥 زیر مجموعه ها: {$userinfo['affiliatescount']} نفر
+🕒 زمان کنونی سرور :
+📆 $datecc → ⏰ $timecc";
     
     // افزودن دکمه تمدید خودکار به منوی مشخصات کاربری
     $keyboard_user_account = json_encode([
@@ -2004,7 +2012,7 @@ if ($text == $datatextbot['text_account']) {
         ]
     ]);
     
-    sendmessage($from_id, $formatted_text, $keyboard_user_account, 'HTML');
+    sendmessage($from_id, $account_text, $keyboard_user_account, 'HTML');
     step('home', $from_id);
 } elseif ($datain == "auto_renewal") {
     // دریافت لیست سرویس‌های کاربر

@@ -506,17 +506,24 @@ function DirectPayment($order_id){
         $charge_amount = intval($Payment_report['price']);
         if($double_charge) {
             $charge_amount *= 2;
+            
+            // اضافه کردن مبلغ به حساب شارژ دوبرابر
+            $double_charge_balance = select("user", "double_charge_balance", "id", $Payment_report['id_user'])['double_charge_balance'];
+            $new_double_charge_balance = intval($double_charge_balance) + $charge_amount;
+            update("user", "double_charge_balance", $new_double_charge_balance, "id", $Payment_report['id_user']);
+        } else {
+            // اضافه کردن مبلغ به حساب عادی
+            $Balance_confrim = intval($Balance_id['Balance']) + $charge_amount;
+            update("user", "Balance", $Balance_confrim, "id", $Payment_report['id_user']);
         }
         
-        $Balance_confrim = intval($Balance_id['Balance']) + $charge_amount;
-        update("user","Balance",$Balance_confrim, "id",$Payment_report['id_user']);
-        update("Payment_report","payment_Status","paid","id_order",$Payment_report['id_order']);
+        update("Payment_report", "payment_Status", "paid", "id_order", $Payment_report['id_order']);
         
         // ارسال پیام به کاربر
         if($double_charge) {
             $format_price_original = number_format($Payment_report['price'], 0);
             $format_price_doubled = number_format($charge_amount, 0);
-            $textpay = "🎁 تبریک! شارژ دوبرابر\n✅ مبلغ {$format_price_original} تومان پرداخت کردید و {$format_price_doubled} تومان شارژ شد!\n🔰 شماره پیگیری: {$Payment_report['id_order']}";
+            $textpay = "🎁 تبریک! شارژ دوبرابر\n✅ مبلغ {$format_price_original} تومان پرداخت کردید و {$format_price_doubled} تومان به شارژ دوبرابر شما اضافه شد!\n🔰 شماره پیگیری: {$Payment_report['id_order']}";
         } else {
         $Payment_report['price'] = number_format($Payment_report['price'], 0);
         $format_price_cart = $Payment_report['price'];
