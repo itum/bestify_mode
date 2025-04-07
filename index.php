@@ -52,7 +52,7 @@ if (intval($from_id) != 0) {
     }else{
         $verify = 1;
     }
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates, verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0', '0', :verify)");
+    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, double_charge_balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates, verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '0', '1', :username, '0', '0', '0', '0', :verify)");
     $stmt->bindParam(':verify', $verify);
     $stmt->bindParam(':from_id', $from_id);
     $stmt->bindParam(':limit_usertest_all', $setting['limit_usertest_all']);
@@ -1981,10 +1981,12 @@ if ($text == $datatextbot['text_account']) {
     $user_count_service = count(select("invoice", "*", "id_user", $from_id,"fetchAll"));
     $userinfo = select("user", "*", "id", $from_id, "select");
     $userbalance = number_format($userinfo['Balance'], 0);
+    $userdoublebalance = number_format($userinfo['double_charge_balance'], 0);
     $formatted_text = sprintf($textbotlang['users']['account'],
         $first_name,
         $from_id,
         $userbalance,
+        $userdoublebalance,
         $user_count_service,
         $userinfo['affiliatescount'],
         $datecc,
@@ -2489,7 +2491,118 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     } else {
         $priceproduct = $info_product['price_product'];
     }
-    if ($priceproduct > $user['Balance']) {
+    
+    // بررسی و استفاده از موجودی شارژ دوبرابر
+    $userinfo = select("user", "*", "id", $from_id, "select");
+    $double_balance = $userinfo['double_charge_balance'];
+    
+    if ($double_balance > 0) {
+        // اگر شارژ دوبرابر داریم، از آن استفاده می‌کنیم
+        if ($double_balance >= $priceproduct) {
+            // موجودی شارژ دوبرابر کافی است
+            $new_double_balance = $double_balance - $priceproduct;
+            update("user", "double_charge_balance", $new_double_balance, "id", $from_id);
+            
+            // ثبت سرویس خریداری شده
+            $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+            $Status = "active";
+            $payment_method = "double_charge";
+            $stmt = $pdo->prepare($sql);
+            $stmt->bindParam(1, $from_id);
+            $stmt->bindParam(2, $randomString);
+            $stmt->bindParam(3, $username_ac, PDO::PARAM_STR);
+            $stmt->bindParam(4, $date);
+            $stmt->bindParam(5, $info_product['Location'], PDO::PARAM_STR);
+            $stmt->bindParam(6, $info_product['name_product'], PDO::PARAM_STR);
+            $stmt->bindParam(7, $priceproduct);
+            $stmt->bindParam(8, $info_product['Volume_constraint']);
+            $stmt->bindParam(9, $info_product['Service_time']);
+            $stmt->bindParam(10, $Status);
+            $stmt->bindParam(11, $payment_method);
+            $stmt->execute();
+            
+            // ارسال پیام موفقیت
+            $payment_message = "✅ پرداخت با موفقیت انجام شد.
+💎 از شارژ دوبرابر شما استفاده شد.
+💰 موجودی شارژ دوبرابر باقیمانده: " . number_format($new_double_balance) . " تومان";
+            
+            sendmessage($from_id, $payment_message, null, 'HTML');
+            // ادامه روند خرید...
+            
+        } else {
+            // موجودی شارژ دوبرابر کافی نیست، ترکیبی استفاده می‌کنیم
+            $remaining_price = $priceproduct - $double_balance;
+            
+            if ($userinfo['Balance'] >= $remaining_price) {
+                // موجودی عادی برای پرداخت باقیمانده کافی است
+                $new_balance = $userinfo['Balance'] - $remaining_price;
+                update("user", "Balance", $new_balance, "id", $from_id);
+                update("user", "double_charge_balance", 0, "id", $from_id);
+                
+                // ثبت سرویس خریداری شده
+                $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+                $Status = "active";
+                $payment_method = "mixed";
+                $stmt = $pdo->prepare($sql);
+                $stmt->bindParam(1, $from_id);
+                $stmt->bindParam(2, $randomString);
+                $stmt->bindParam(3, $username_ac, PDO::PARAM_STR);
+                $stmt->bindParam(4, $date);
+                $stmt->bindParam(5, $info_product['Location'], PDO::PARAM_STR);
+                $stmt->bindParam(6, $info_product['name_product'], PDO::PARAM_STR);
+                $stmt->bindParam(7, $priceproduct);
+                $stmt->bindParam(8, $info_product['Volume_constraint']);
+                $stmt->bindParam(9, $info_product['Service_time']);
+                $stmt->bindParam(10, $Status);
+                $stmt->bindParam(11, $payment_method);
+                $stmt->execute();
+                
+                // ارسال پیام موفقیت
+                $payment_message = "✅ پرداخت با موفقیت انجام شد.
+💎 از کل شارژ دوبرابر شما (" . number_format($double_balance) . " تومان) استفاده شد.
+💰 " . number_format($remaining_price) . " تومان از موجودی عادی شما کسر شد.
+💰 موجودی فعلی: " . number_format($new_balance) . " تومان";
+                
+                sendmessage($from_id, $payment_message, null, 'HTML');
+                // ادامه روند خرید...
+                
+            } else {
+                // حتی با ترکیب موجودی‌ها هم کافی نیست
+                $total_available = $double_balance + $userinfo['Balance'];
+                $shortage = $priceproduct - $total_available;
+                
+                // فرمت کردن مقادیر برای نمایش
+                $formatted_double_balance = number_format($double_balance);
+                $user_balance = number_format($userinfo['Balance']);
+                $price_format = number_format($priceproduct);
+                $shortage_format = number_format($shortage);
+                
+                update("user", "Processing_value", $shortage, "id", $from_id);
+                
+                // ایجاد پیام خطا با مقادیر مورد نیاز
+                $error_message = "🚨 خطایی در هنگام پرداخت رخ داده است.
+📝 دلیل خطا: موجودی شما کافی نمی باشد
+
+💎 موجودی شارژ دوبرابر: " . $formatted_double_balance . " تومان
+💰 موجودی عادی: " . $user_balance . " تومان
+💲 مبلغ مورد نیاز: " . $price_format . " تومان
+⚠️ کمبود اعتبار: " . $shortage_format . " تومان
+
+❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
+                
+                sendmessage($from_id, $error_message, $step_payment, 'HTML');
+                step('get_step_payment', $from_id);
+                $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time,Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)");
+                $Status = "unpaid";
+                $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
+                $stmt->execute();
+                $stmt->close();
+                update("user","Processing_value_one",$username_ac, "id",$from_id);
+                update("user","Processing_value_tow","getconfigafterpay", "id",$from_id);
+                return;
+            }
+        }
+    } else if ($priceproduct > $user['Balance']) {
         $Balance_prim = $priceproduct - $user['Balance'];
         update("user","Processing_value",$Balance_prim, "id",$from_id);
         
@@ -2508,20 +2621,38 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
 
 ❌ برای شارژ حساب کاربری خود یکی از روش های پرداخت زیر را انتخاب کنید";
         
-        // ثبت خطا در فایل لاگ برای بررسی
-        error_log("Debug error message: " . $error_message);
-        error_log("Values: Balance=" . $user_balance . ", Price=" . $price_format . ", Shortage=" . $shortage);
-        
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
         $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time,Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)");
-        $Status =  "unpaid";
+        $Status = "unpaid";
         $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
         $stmt->execute();
         $stmt->close();
         update("user","Processing_value_one",$username_ac, "id",$from_id);
         update("user","Processing_value_tow","getconfigafterpay", "id",$from_id);
         return;
+    } else {
+        // عدم وجود شارژ دوبرابر و کافی بودن موجودی عادی
+        $Balance_prim = $user['Balance'] - $priceproduct;
+        update("user", "Balance", $Balance_prim, "id", $from_id);
+        
+        // ثبت سرویس خریداری شده
+        $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status, payment_method) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $Status = "active";
+        $payment_method = "balance";
+        $stmt = $pdo->prepare($sql);
+        $stmt->bindParam(1, $from_id);
+        $stmt->bindParam(2, $randomString);
+        $stmt->bindParam(3, $username_ac, PDO::PARAM_STR);
+        $stmt->bindParam(4, $date);
+        $stmt->bindParam(5, $info_product['Location'], PDO::PARAM_STR);
+        $stmt->bindParam(6, $info_product['name_product'], PDO::PARAM_STR);
+        $stmt->bindParam(7, $priceproduct);
+        $stmt->bindParam(8, $info_product['Volume_constraint']);
+        $stmt->bindParam(9, $info_product['Service_time']);
+        $stmt->bindParam(10, $Status);
+        $stmt->bindParam(11, $payment_method);
+        $stmt->execute();
     }
     if (in_array($randomString, $id_invoice)) {
         $randomString = $random_number . $randomString;
@@ -3286,6 +3417,16 @@ if ($datain == "Discount") {
     $stmt->bindParam(':code', $text, PDO::PARAM_STR);
     $stmt->execute();
     $get_codesql = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    // بررسی اگر کاربر موجودی شارژ دوبرابر دارد
+    $userinfo = select("user", "*", "id", $from_id, "select");
+    if ($userinfo['double_charge_balance'] > 0) {
+        // اگر کاربر شارژ دوبرابر داشته باشد، پیام مناسب نمایش داده شود
+        sendmessage($from_id, "❌ کد هدیه برای حساب با موجودی شارژ دوبرابر قابل استفاده نیست. لطفا ابتدا موجودی شارژ دوبرابر خود را استفاده کنید.", $keyboard, 'HTML');
+        step('home', $from_id);
+        return;
+    }
+    
     $balance_user = $user['Balance'] + $get_codesql['price'];
     update("user", "Balance", $balance_user, "id", $from_id);
     $stmt = $pdo->prepare("SELECT * FROM Discount WHERE code = :code");
