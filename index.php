@@ -4109,6 +4109,15 @@ elseif ($datain == "paypanel") {
     }
 }
 elseif ($datain == "add_balance_custom") {
+    // ایجاد یک کیبورد اینلاین برای دکمه برگشت
+    $back_inline_keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 بازگشت", 'callback_data' => 'backuser']
+            ]
+        ]
+    ]);
+    
     Editmessagetext($from_id, $message_id, "💰 وارد کردن مبلغ دلخواه
 
 ✏️ لطفا مبلغ مورد نظر خود را به تومان وارد کنید.
@@ -4119,7 +4128,7 @@ elseif ($datain == "add_balance_custom") {
 • فقط عدد وارد کنید (بدون ویرگول یا نقطه)
 • اعداد فارسی و عربی نیز قابل قبول هستند
 
-🔄 مثال صحیح: 50000", $backuser, 'HTML');
+🔄 مثال صحیح: 50000", $back_inline_keyboard, 'HTML');
     step('getprice', $from_id);
 }
 elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
