@@ -3315,6 +3315,29 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
             $stmt->bindParam(8, $transaction_details);
             $stmt->execute();
             
+            // ارسال گزارش تایید خودکار پرداخت به کانال لاگ
+            $setting = select("setting", "*", null, null, "select");
+            $amount_formatted = number_format($amount);
+            $username = isset($username) ? $username : "";
+            $fullname = isset($first_name) ? $first_name . " " . (isset($last_name) ? $last_name : "") : "";
+            $user_info = (!empty($username) ? "🆔 @{$username}" : "") . 
+                        (!empty($fullname) ? "\n👤 {$fullname}" : "");
+            
+            $text_report = "✅ تایید خودکار پرداخت کارت به کارت
+
+💰 مبلغ: <b>{$amount_formatted}</b> تومان
+👤 کاربر: <a href='tg://user?id={$from_id}'>{$from_id}</a>
+{$user_info}
+⏱ زمان: {$dateacc}
+🔖 شماره پیگیری: {$randomString}
+⚙️ روش: تایید خودکار مبلغ دقیق
+
+♻️ این تراکنش به صورت خودکار توسط سیستم تایید شد.";
+
+            if (isset($setting['Channel_Report']) && strlen($setting['Channel_Report']) > 0) {
+                sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
+            }
+            
             // پیام موفقیت‌آمیز به کاربر
             sendmessage($from_id, sprintf($textbotlang['users']['moeny']['Charged.'], number_format($amount), $randomString), $keyboard, 'HTML');
             step('home', $from_id);
