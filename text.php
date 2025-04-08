@@ -427,7 +427,7 @@ $textbotlang['users']['moeny']['carttext'] = "📊 فاکتور خرید
 
 💳 شماره کارت: <b><code>%s</code></b>
 👤 به نام: <b>%s</b>
-💸 مبلغ: <b><code>%s</code></b> ریال
+💸 مبلغ: <b><code>%s</code></b> تومان
 معادل: <b>%s</b>
 
 نکات مهم:

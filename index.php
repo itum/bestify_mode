@@ -2977,7 +2977,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         update("user", "Processing_value", $random_amount, "id", $from_id);
         $Processing_value = number_format($random_amount);
         $amount_rial = $random_amount * 10; // تبدیل به ریال
-        $amount_rial_formatted = number_format($amount_rial);
+        $amount_rial_formatted = $amount_rial; // حذف کاما از مبلغ ریال
         $amount_in_words = convert_to_persian_words($random_amount) . " تومان";
         $textcart = sprintf($textbotlang['users']['moeny']['carttext'],
             $random_amount,
@@ -4401,3 +4401,26 @@ elseif ($datain == "wallet") {
     Editmessagetext($from_id, $message_id, $text_balance, $keyboard);
 }
 // ... existing code ...
+
+if($userInfo['Processing_value'] == "cart_to_offline"){
+    $PaySetting = select("PaySetting", "*" , null);
+    $random_number = rand(10000, 99999);
+    $stmt = $pdo->prepare("UPDATE user SET step = ?, UserActive = ? ,num_fail_pay = ?, rand_cart = ? WHERE id = ?");
+    $PaySettings = select("PaySetting", "*" , null);
+    $Description_vared = "&proxy";
+    $Invoice_vared = select("Invoice", "*" , "number_rand" , $random_number);
+    $stmt->execute(['confirmPayment', $userInfo['UserActive'], $userInfo['num_fail_pay'] + 1, $random_number, $from_id]);
+    if($userInfo['UserActive'] == "ok"){
+        $amount_status = "✅ کاربر فعال";
+    }
+    else{
+        $amount_status = "❌ کاربر غیر فعال";
+    }
+    $text = sprintf($textbotlang['users']['moeny']['carttext'], number_format($userInfo['Processing_value_Currency']), $PaySettings['card_number'], $PaySettings['card_number_name'], $userInfo['Processing_value_Currency'], $amount_status);
+    sendmessage($from_id, $text, 'HTML', $shopkeyboard);
+    $text = sprintf($textbotlang['users']['moeny']['Operation'], $from_id, $from_id, "<a href='tg://user?id=$from_id'>$first_name</a>", $userInfo['Processing_value_Currency']);
+    sendmessage($Config['Channel_Report'], $text, 'HTML', $backadmin);
+    $sql = "INSERT INTO Payment_report (Id_user,amount,date,payment_method,Description,from_name,from_user,type,state,step,rand_invoice,time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
+    $stmt = $pdo->prepare($sql);
+    $stmt->execute([$from_id, $userInfo['Processing_value_Currency'], $date, "cart to cart", $Description_vared, $first_name, "$username", "factor", "sent", "Manual charge - Card", $random_number, time()]);
+}
