@@ -2980,7 +2980,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         $amount_rial_formatted = number_format($amount_rial);
         $amount_in_words = convert_to_persian_words($random_amount) . " تومان";
         $textcart = sprintf($textbotlang['users']['moeny']['carttext'],
-            $Processing_value,
+            $random_amount,
             $PaySetting,
             "مدیر سیستم", // نام صاحب حساب
             $amount_rial_formatted,
