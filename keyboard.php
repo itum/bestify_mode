@@ -69,11 +69,16 @@ $keyboardPanel = json_encode([
 ]);
 $keyboardadmin = json_encode([
     'keyboard' => [
-        [['text' => "👤 مدیریت کاربران"], ['text' => "📱 مدیریت سرویس ها"]],
-        [['text' => "💸 افزایش موجودی"], ['text' => "🖥 آمار ربات"]],
-        [['text' => "⚙️ تنظیمات"]],
-        [['text' => "✉️ ارسال همگانی"], ['text' => "📤 فوروارد همگانی"]],
-        [['text' => "📝 تنظیم متن ربات"]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['user_services']], ['text' => $textbotlang['Admin']['keyboardadmin']['manage_panel']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['add_panel']], ['text' => $textbotlang['Admin']['keyboardadmin']['bot_statistics']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['settings']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['send_message']], ['text' => $textbotlang['Admin']['keyboardadmin']['bot_text_settings']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['affiliate_settings']], ['text' => $textbotlang['Admin']['agency']['list_button']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['user_search']], ['text' => $textbotlang['Admin']['keyboardadmin']['finance']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['shop_section']], ['text' => $textbotlang['Admin']['keyboardadmin']['admin_section']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['test_account_settings']]],
+        [['text' => $textbotlang['Admin']['keyboardadmin']['tutorial_section']]],
+        [['text' => $textbotlang['users']['backhome']]]
     ],
     'resize_keyboard' => true
 ]);

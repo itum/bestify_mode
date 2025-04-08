@@ -3746,3 +3746,8 @@ crontab -e
 #-------------------------------------------------
 // کد مربوط به ارسال پیام به itman1 حذف شد
 // ... existing code ...
+
+// بخش مربوط به دکمه مدیریت پنل ادمین
+if($text == $textbotlang['Admin']['commendadmin']){
+    sendmessage($from_id, $textbotlang['Admin']['lockhome'] , $keyboardadmin, 'HTML');
+}
