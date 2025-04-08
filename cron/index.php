@@ -2843,7 +2843,8 @@ if ($text == $textbotlang['users']['agency']['request_button']) {
     sendmessage($from_id, $textbotlang['users']['agency']['request_sent'], $keyboard, 'html');
     update("user", "step", "none", "id", $from_id);
 }
-require_once 'admin.php';
+// اینجا فایل admin.php را وارد می‌کنیم
+require_once __DIR__ . '/../admin.php';
 $connect->close();
 
 // تابع convert_numbers_to_english به functions.php منتقل شده است

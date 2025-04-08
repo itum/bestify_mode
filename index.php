@@ -3647,7 +3647,8 @@ elseif ($user['step'] == "set_display_name") {
     sendmessage($from_id, "برای مشاهده اطلاعات سرویس خود، روی دکمه زیر کلیک کنید:", $keyboardback, 'html');
 }
 
-require_once 'admin.php';
+// اینجا فایل admin.php را وارد می‌کنیم
+require_once __DIR__ . '/admin.php';
 $connect->close();
 
 // اضافه کردن کد پردازش جستجو و فیلتر
