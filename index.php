@@ -49,10 +49,38 @@ if(!in_array($from_id,$users_ids) && intval($from_id) != 0){
 if (intval($from_id) != 0) {
     if(intval($setting['status_verify']) == 1){
         $verify = 0;
-    }else{
+    } else {
         $verify = 1;
     }
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates,verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0', '0',:verify)");
+    
+    // بررسی وجود جدول user
+    $table_exists = $pdo->query("SHOW TABLES LIKE 'user'")->rowCount() > 0;
+    if (!$table_exists) {
+        // ایجاد جدول user اگر وجود نداشته باشد
+        $pdo->exec("CREATE TABLE IF NOT EXISTS user (
+            id BIGINT PRIMARY KEY,
+            step VARCHAR(50) DEFAULT 'none',
+            limit_usertest INT DEFAULT 0,
+            User_Status VARCHAR(20) DEFAULT 'Active',
+            number VARCHAR(20) DEFAULT 'none',
+            Balance DECIMAL(10,2) DEFAULT 0,
+            pagenumber INT DEFAULT 1,
+            username VARCHAR(255),
+            message_count INT DEFAULT 0,
+            last_message_time INT DEFAULT 0,
+            affiliatescount INT DEFAULT 0,
+            affiliates INT DEFAULT 0,
+            verify TINYINT(1) DEFAULT 0,
+            Processing_value DECIMAL(10,2) DEFAULT 0,
+            Processing_value_one VARCHAR(255) DEFAULT '0',
+            Processing_value_tow VARCHAR(255) DEFAULT '0',
+            Processing_value_three VARCHAR(255) DEFAULT '0',
+            Processing_value_four VARCHAR(255) DEFAULT '0'
+        )");
+    }
+    
+    // درج کاربر جدید با استفاده از ستون‌های پیش‌فرض
+    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, username, verify, limit_usertest) VALUES (:from_id, :username, :verify, :limit_usertest_all)");
     $stmt->bindParam(':verify', $verify);
     $stmt->bindParam(':from_id', $from_id);
     $stmt->bindParam(':limit_usertest_all', $setting['limit_usertest_all']);
@@ -63,13 +91,24 @@ $user = select("user", "*", "id", $from_id, "select");
 if ($user == false) {
     $user = array();
     $user = array(
-        'step' => '',
-        'Processing_value' => '',
-        'User_Status' => '',
-        'username' => '',
-        'limit_usertest' => '',
-        'last_message_time' => '',
-        'affiliates' => '',
+        'id' => $from_id,
+        'step' => 'none',
+        'limit_usertest' => $setting['limit_usertest_all'],
+        'User_Status' => 'Active',
+        'number' => 'none',
+        'Balance' => 0,
+        'pagenumber' => 1,
+        'username' => $username,
+        'message_count' => 0,
+        'last_message_time' => 0,
+        'affiliatescount' => 0,
+        'affiliates' => 0,
+        'verify' => $verify,
+        'Processing_value' => 0,
+        'Processing_value_one' => '0',
+        'Processing_value_tow' => '0',
+        'Processing_value_three' => '0',
+        'Processing_value_four' => '0'
     );
 }
 if(($setting['status_verify'] == "1" && intval($user['verify']) == 0) && !in_array($from_id,$admin_ids)){
@@ -444,6 +483,22 @@ if ($text == $datatextbot['text_Purchased_services'] || $datain == "backorder" |
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    
+    // تعریف متغیرهای مورد نیاز
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی سرویس‌های نامعتبر",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
+    
+    $search_service_button = [
+        [
+            'text' => "🔎 جستجوی سرویس",
+            'callback_data' => 'search_service'
+        ]
+    ];
+    
     $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $search_service_button;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
@@ -579,6 +634,22 @@ if ($datain == 'next_page') {
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    
+    // تعریف متغیرهای مورد نیاز
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی سرویس‌های نامعتبر",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
+    
+    $search_service_button = [
+        [
+            'text' => "🔎 جستجوی سرویس",
+            'callback_data' => 'search_service'
+        ]
+    ];
+    
     $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $search_service_button;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
@@ -707,6 +778,22 @@ if ($datain == 'next_page') {
     if ($setting['NotUser'] == "1") {
         $keyboardlists['inline_keyboard'][] = $usernotlist;
     }
+    
+    // تعریف متغیرهای مورد نیاز
+    $check_invalid_services = [
+        [
+            'text' => "🔍 بررسی سرویس‌های نامعتبر",
+            'callback_data' => 'check_invalid_services'
+        ]
+    ];
+    
+    $search_service_button = [
+        [
+            'text' => "🔎 جستجوی سرویس",
+            'callback_data' => 'search_service'
+        ]
+    ];
+    
     $keyboardlists['inline_keyboard'][] = $check_invalid_services;
     $keyboardlists['inline_keyboard'][] = $search_service_button;
     $keyboardlists['inline_keyboard'][] = $pagination_buttons;
@@ -2879,14 +2966,47 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     if ($text > 10000000 or $text < 5000)
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorpricelimit'], null, 'HTML');
     update("user", "Processing_value", $text, "id", $from_id);
-    sendmessage($from_id, $textbotlang['users']['Balance']['selectPatment'], $step_payment, 'HTML');
+    $formatted_price = number_format($text);
+    
+    // ایجاد کیبورد جدید با دکمه‌های "بله" و "کارت به کارت"
+    $confirm_payment_keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => 'بله، کارت به کارت میکنم', 'callback_data' => 'cart_to_offline'],
+            ],
+            [
+                ['text' => $textbotlang['users']['Balance']['Back-Balance'], 'callback_data' => 'back'],
+            ]
+        ]
+    ]);
+    
+    sendmessage($from_id, sprintf($textbotlang['users']['Balance']['Payment-Method'], $formatted_price), $confirm_payment_keyboard, 'HTML');
     step('get_step_payment', $from_id);
 } elseif ($user['step'] == "get_step_payment") {
     if ($datain == "cart_to_offline") {
         $PaySetting = select("PaySetting", "ValuePay", "NamePay", "CartDescription", "select")['ValuePay'];
-        $Processing_value = number_format($user['Processing_value']);
+        $base_amount = $user['Processing_value'];
+        $random_amount = generate_random_amount($base_amount);
+        update("user", "Processing_value", $random_amount, "id", $from_id);
+        $Processing_value = number_format($random_amount);
         $textcart = sprintf($textbotlang['users']['moeny']['carttext'],$Processing_value,$PaySetting);
-        sendmessage($from_id, $textcart, $backuser, 'HTML');
+        
+        // اضافه کردن دکمه پرداخت کردم و ارسال تصویر فیش
+        $payment_keyboard = json_encode([
+            'inline_keyboard' => [
+                [
+                    ['text' => 'پرداخت کردم', 'callback_data' => "check_payment_{$random_amount}"]
+                ],
+                [
+                    ['text' => 'ارسال تصویر فیش', 'callback_data' => "send_receipt_image"]
+                ],
+                [
+                    ['text' => $textbotlang['users']['Balance']['Back-Balance'], 'callback_data' => "back"]
+                ]
+            ]
+        ]);
+        
+        sendmessage($from_id, $textcart, $payment_keyboard, 'HTML');
         step('cart_to_cart_user', $from_id);
     }
     if ($datain == "aqayepardakht") {
@@ -3165,61 +3285,158 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
         );
     }
 } elseif ($user['step'] == "cart_to_cart_user") {
-    if (!$photo) {
-        sendmessage($from_id, $textbotlang['users']['Balance']['Invalid-receipt'], null, 'HTML');
+    if (strpos($datain, "check_payment_") === 0) {
+        $amount = str_replace("check_payment_", "", $datain);
+        
+        // بررسی آیا این تراکنش قبلاً ثبت شده است
+        $stmt = $pdo->prepare("SELECT * FROM Payment_report WHERE id_user = ? AND price = ? AND payment_Status = 'paid' AND Payment_Method = 'درگاه پرداخت خودکار' AND time > DATE_SUB(NOW(), INTERVAL 1 DAY)");
+        $stmt->bindParam(1, $from_id);
+        $stmt->bindParam(2, $amount);
+        $stmt->execute();
+        
+        if($stmt->rowCount() > 0) {
+            // این تراکنش قبلاً پردازش شده است
+            telegram('answerCallbackQuery', array(
+                'callback_query_id' => $callback_query_id,
+                'text' => "این پرداخت قبلاً تأیید شده است و به کیف پول شما اضافه شده است.",
+                'show_alert' => true,
+                'cache_time' => 5,
+            ));
+            return;
+        }
+        
+        $payment_result = check_payment_status($user['id'], $amount);
+        
+        if ($payment_result['status']) {
+            // پرداخت تایید شد
+            $transaction = $payment_result['transaction'];
+            $Balance_confrim = intval($user['Balance']) + intval($amount);
+            update("user", "Balance", $Balance_confrim, "id", $from_id);
+            
+            // ذخیره اطلاعات تراکنش در دیتابیس
+            $dateacc = date('Y/m/d H:i:s');
+            $randomString = bin2hex(random_bytes(5));
+            $payment_Status = "paid";
+            $Payment_Method = "درگاه پرداخت خودکار";
+            
+            if($user['Processing_value_tow'] == "getconfigafterpay"){
+                $invoice = "{$user['Processing_value_tow']}|{$user['Processing_value_one']}";
+            } else {
+                $invoice = "0|0";
+            }
+            
+            $stmt = $pdo->prepare("INSERT INTO Payment_report (id_user, id_order, time, price, payment_Status, Payment_Method, invoice, transaction_details) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt->bindParam(1, $from_id);
+            $stmt->bindParam(2, $randomString);
+            $stmt->bindParam(3, $dateacc);
+            $stmt->bindParam(4, $amount, PDO::PARAM_STR);
+            $stmt->bindParam(5, $payment_Status);
+            $stmt->bindParam(6, $Payment_Method);
+            $stmt->bindParam(7, $invoice);
+            $transaction_details = json_encode($transaction);
+            $stmt->bindParam(8, $transaction_details);
+            $stmt->execute();
+            
+            // ویرایش پیام فعلی به جای ارسال پیام جدید
+            $success_keyboard = json_encode([
+                'inline_keyboard' => [
+                    [
+                        ['text' => '🏠 بازگشت به منوی اصلی', 'callback_data' => 'gotohome']
+                    ]
+                ]
+            ]);
+            
+            $success_message = sprintf($textbotlang['users']['moeny']['Charged.'], number_format($amount), $randomString);
+            Editmessagetext($from_id, $message_id, $success_message, $success_keyboard);
+            
+            step('home', $from_id);
+        } else {
+            // پرداخت تایید نشد
+            $error_message = isset($payment_result['message']) ? $payment_result['message'] : "دلیل خطا نامشخص است";
+            
+            telegram('answerCallbackQuery', array(
+                'callback_query_id' => $callback_query_id,
+                'text' => "❌ پرداخت شما تایید نشد: {$error_message}",
+                'show_alert' => true,
+                'cache_time' => 5,
+            ));
+        }
+        return;
+    } else if ($datain == "gotohome") {
+        Editmessagetext($from_id, $message_id, "به منوی اصلی بازگشتید.", $keyboard);
+        return;
+    } else if ($datain == "send_receipt_image") {
+        sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt-help'], null, 'HTML');
+        return;
+    } else if ($text == $textbotlang['users']['Balance']['Back-Balance'] || $datain == "back") {
+        step('get_step_payment', $from_id);
+        sendmessage($from_id, $textbotlang['users']['Balance']['Payment-Method'], $step_payment, 'HTML');
+        return;
+    } else if ($photo) {
+        // کد مربوط به ارسال تصویر فیش
+        $dateacc = date('Y/m/d H:i:s');
+        $randomString = bin2hex(random_bytes(5));
+        $payment_Status = "Unpaid";
+        $Payment_Method = "cart to cart";
+        
+        if($user['Processing_value_tow'] == "getconfigafterpay"){
+            $invoice = "{$user['Processing_value_tow']}|{$user['Processing_value_one']}";
+        } else {
+            $invoice = "0|0";
+        }
+        
+        $stmt = $pdo->prepare("INSERT INTO Payment_report (id_user, id_order, time, price, payment_Status, Payment_Method, invoice) VALUES (?, ?, ?, ?, ?, ?, ?)");
+        $stmt->bindParam(1, $from_id);
+        $stmt->bindParam(2, $randomString);
+        $stmt->bindParam(3, $dateacc);
+        $stmt->bindParam(4, $user['Processing_value'], PDO::PARAM_STR);
+        $stmt->bindParam(5, $payment_Status);
+        $stmt->bindParam(6, $Payment_Method);
+        $stmt->bindParam(7, $invoice);
+        $stmt->execute();
+        
+        if ($user['Processing_value_tow'] == "getconfigafterpay"){
+            sendmessage($from_id, $textbotlang['users']['Balance']['Send-receip-buy'], $keyboard, 'HTML');
+        } else {
+            sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt'], $keyboard, 'HTML');
+        }
+        
+        $Confirm_pay = json_encode([
+            'inline_keyboard' => [
+                [
+                    ['text' => $textbotlang['users']['Balance']['Confirmpaying'], 'callback_data' => "Confirm_pay_{$randomString}"],
+                    ['text' => $textbotlang['users']['Balance']['reject_pay'], 'callback_data' => "reject_pay_{$randomString}"],
+                ]
+            ]
+        ]);
+        
+        $Processing_value = number_format($user['Processing_value']);
+        
+        // بررسی وضعیت نمایندگی کاربر
+        $agency_status = "";
+        $checkAgency = select("agency", "*", "user_id", $from_id, "select");
+        if ($checkAgency && $checkAgency['status'] == 'approved') {
+            $agency_status = "👤 نماینده";
+        }
+        
+        $textsendrasid = sprintf($textbotlang['users']['moeny']['cartresid'], $from_id, $randomString, $username, $Processing_value, $agency_status);
+        
+        foreach ($admin_ids as $id_admin) {
+            telegram('sendphoto', [
+                'chat_id' => $id_admin,
+                'photo' => $photoid,
+                'reply_markup' => $Confirm_pay,
+                'caption' => $textsendrasid,
+                'parse_mode' => "HTML",
+            ]);
+        }
+        
+        step('home', $from_id);
+    } else if (!$photo && $text) {
+        // اگر متنی ارسال شده و رسیدی نیست، پیام آموزشی نمایش دهیم
+        sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt-help'], null, 'HTML');
         return;
     }
-    $dateacc = date('Y/m/d H:i:s');
-    $randomString = bin2hex(random_bytes(5));
-    $payment_Status = "Unpaid";
-    $Payment_Method = "cart to cart";
-    if($user['Processing_value_tow'] == "getconfigafterpay"){
-        $invoice = "{$user['Processing_value_tow']}|{$user['Processing_value_one']}";
-    }else{
-        $invoice = "0|0";
-    }
-    $stmt = $pdo->prepare("INSERT INTO Payment_report (id_user, id_order, time, price, payment_Status, Payment_Method,invoice) VALUES (?, ?, ?, ?, ?, ?,?)");
-    $stmt->bindParam(1, $from_id);
-    $stmt->bindParam(2, $randomString);
-    $stmt->bindParam(3, $dateacc);
-    $stmt->bindParam(4, $user['Processing_value'], PDO::PARAM_STR);
-    $stmt->bindParam(5, $payment_Status);
-    $stmt->bindParam(6, $Payment_Method);
-    $stmt->bindParam(7, $invoice);
-    $stmt->execute();
-    if ($user['Processing_value_tow'] == "getconfigafterpay"){
-        sendmessage($from_id, $textbotlang['users']['Balance']['Send-receip-buy'], $keyboard, 'HTML');
-    }else{
-        sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt'], $keyboard, 'HTML');
-    }
-    $Confirm_pay = json_encode([
-        'inline_keyboard' => [
-            [
-                ['text' => $textbotlang['users']['Balance']['Confirmpaying'], 'callback_data' => "Confirm_pay_{$randomString}"],
-                ['text' => $textbotlang['users']['Balance']['reject_pay'], 'callback_data' => "reject_pay_{$randomString}"],
-            ]
-        ]
-    ]);
-    $Processing_value = number_format($user['Processing_value']);
-    
-    // بررسی وضعیت نمایندگی کاربر
-    $agency_status = "";
-    $checkAgency = select("agency", "*", "user_id", $from_id, "select");
-    if ($checkAgency && $checkAgency['status'] == 'approved') {
-        $agency_status = "👑 کاربر نماینده است - درصد تخفیف: " . $checkAgency['discount_percent'] . "%\n";
-    }
-    
-    $textsendrasid = sprintf($textbotlang['users']['moeny']['cartresid'], $from_id, $randomString, $username, $Processing_value, $agency_status, $caption);
-    foreach ($admin_ids as $id_admin) {
-        telegram('sendphoto', [
-            'chat_id' => $id_admin,
-            'photo' => $photoid,
-            'reply_markup' => $Confirm_pay,
-            'caption' => $textsendrasid,
-            'parse_mode' => "HTML",
-        ]);
-    }
-    step('home', $from_id);
 }
 
 #----------------Discount------------------#
