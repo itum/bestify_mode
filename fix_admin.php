@@ -54,37 +54,4 @@ EOD;
     echo "✅ تابع convert_numbers_to_english در فایل functions.php وجود دارد.\n";
 }
 
-echo "\n✅ عملیات با موفقیت انجام شد. حالا باید خطای 'Cannot redeclare function convert_numbers_to_english()' برطرف شده باشد.\n";
-
-require_once 'config.php';
-require_once 'functions.php';
-
-// اتصال به دیتابیس
-$conn = new mysqli(DB_HOST, DB_USER, DB_PASS, DB_NAME);
-if ($conn->connect_error) {
-    die("Connection failed: " . $conn->connect_error);
-}
-
-// ساخت جدول auto_payment_checks
-$sql = "CREATE TABLE IF NOT EXISTS auto_payment_checks (
-    id INT AUTO_INCREMENT PRIMARY KEY,
-    check_id VARCHAR(10) NOT NULL,
-    user_id INT NOT NULL,
-    amount INT NOT NULL,
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    status ENUM('pending', 'success', 'failed') NOT NULL DEFAULT 'pending',
-    completed_at DATETIME DEFAULT NULL,
-    message_id INT DEFAULT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-)";
-
-if ($conn->query($sql) === TRUE) {
-    echo "جدول auto_payment_checks با موفقیت ساخته شد\n";
-} else {
-    echo "خطا در ساخت جدول auto_payment_checks: " . $conn->error . "\n";
-}
-
-// بستن اتصال
-$conn->close();
-?> 
+echo "\n✅ عملیات با موفقیت انجام شد. حالا باید خطای 'Cannot redeclare function convert_numbers_to_english()' برطرف شده باشد.\n"; 

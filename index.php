@@ -2966,21 +2966,8 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     if ($text > 10000000 or $text < 5000)
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorpricelimit'], null, 'HTML');
     update("user", "Processing_value", $text, "id", $from_id);
-    $formatted_price = number_format($text);
-    
-    // ایجاد کیبورد جدید با دکمه‌های "بله" و "کارت به کارت"
-    $confirm_payment_keyboard = json_encode([
-        'inline_keyboard' => [
-            [
-                ['text' => 'بله، کارت به کارت میکنم', 'callback_data' => 'cart_to_offline'],
-            ],
-            [
-                ['text' => $textbotlang['users']['Balance']['Back-Balance'], 'callback_data' => 'back'],
-            ]
-        ]
-    ]);
-    
-    sendmessage($from_id, sprintf($textbotlang['users']['Balance']['Payment-Method'], $formatted_price), $confirm_payment_keyboard, 'HTML');
+    $formatted_amount = number_format($text);
+    sendmessage($from_id, sprintf($textbotlang['users']['Balance']['Payment-Method'], $formatted_amount), $step_payment, 'HTML');
     step('get_step_payment', $from_id);
 } elseif ($user['step'] == "get_step_payment") {
     if ($datain == "cart_to_offline") {
@@ -3287,24 +3274,6 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
 } elseif ($user['step'] == "cart_to_cart_user") {
     if (strpos($datain, "check_payment_") === 0) {
         $amount = str_replace("check_payment_", "", $datain);
-        
-        // بررسی آیا این تراکنش قبلاً ثبت شده است
-        $stmt = $pdo->prepare("SELECT * FROM Payment_report WHERE id_user = ? AND price = ? AND payment_Status = 'paid' AND Payment_Method = 'درگاه پرداخت خودکار' AND time > DATE_SUB(NOW(), INTERVAL 1 DAY)");
-        $stmt->bindParam(1, $from_id);
-        $stmt->bindParam(2, $amount);
-        $stmt->execute();
-        
-        if($stmt->rowCount() > 0) {
-            // این تراکنش قبلاً پردازش شده است
-            telegram('answerCallbackQuery', array(
-                'callback_query_id' => $callback_query_id,
-                'text' => "این پرداخت قبلاً تأیید شده است و به کیف پول شما اضافه شده است.",
-                'show_alert' => true,
-                'cache_time' => 5,
-            ));
-            return;
-        }
-        
         $payment_result = check_payment_status($user['id'], $amount);
         
         if ($payment_result['status']) {
@@ -3337,33 +3306,14 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
             $stmt->bindParam(8, $transaction_details);
             $stmt->execute();
             
-            // ویرایش پیام فعلی به جای ارسال پیام جدید
-            $success_keyboard = json_encode([
-                'inline_keyboard' => [
-                    [
-                        ['text' => '🏠 بازگشت به منوی اصلی', 'callback_data' => 'gotohome']
-                    ]
-                ]
-            ]);
-            
-            $success_message = sprintf($textbotlang['users']['moeny']['Charged.'], number_format($amount), $randomString);
-            Editmessagetext($from_id, $message_id, $success_message, $success_keyboard);
-            
+            // پیام موفقیت‌آمیز به کاربر
+            sendmessage($from_id, sprintf($textbotlang['users']['moeny']['Charged.'], number_format($amount), $randomString), $keyboard, 'HTML');
             step('home', $from_id);
         } else {
             // پرداخت تایید نشد
             $error_message = isset($payment_result['message']) ? $payment_result['message'] : "دلیل خطا نامشخص است";
-            
-            telegram('answerCallbackQuery', array(
-                'callback_query_id' => $callback_query_id,
-                'text' => "❌ پرداخت شما تایید نشد: {$error_message}",
-                'show_alert' => true,
-                'cache_time' => 5,
-            ));
+            sendmessage($from_id, "❌ پرداخت شما تایید نشد: {$error_message}\n\nلطفا دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.", null, 'HTML');
         }
-        return;
-    } else if ($datain == "gotohome") {
-        Editmessagetext($from_id, $message_id, "به منوی اصلی بازگشتید.", $keyboard);
         return;
     } else if ($datain == "send_receipt_image") {
         sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt-help'], null, 'HTML');
@@ -4365,7 +4315,8 @@ elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
     update("user", "Processing_value", $amount, "id", $from_id);
     
     // Отображение выбора метода оплаты
-    Editmessagetext($from_id, $message_id, $textbotlang['users']['Balance']['selectpayment'], $step_payment);
+    $formatted_amount = number_format($amount);
+    Editmessagetext($from_id, $message_id, sprintf($textbotlang['users']['Balance']['confirm_charge_amount'], $formatted_amount), $step_payment);
     step('get_step_payment', $from_id);
 }
 

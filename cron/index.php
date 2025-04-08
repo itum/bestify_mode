@@ -2345,24 +2345,11 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     
     if (!is_numeric($text))
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorprice'], null, 'HTML');
-    if ($text > 10000000 or $text < 5000)
+    if ($text > 10000000 or $text < 20000)
         return sendmessage($from_id, $textbotlang['users']['Balance']['errorpricelimit'], null, 'HTML');
     update("user", "Processing_value", $text, "id", $from_id);
-    $formatted_price = number_format($text);
-    
-    // ایجاد کیبورد جدید با دکمه‌های "بله" و "کارت به کارت"
-    $confirm_payment_keyboard = json_encode([
-        'inline_keyboard' => [
-            [
-                ['text' => 'بله، کارت به کارت میکنم', 'callback_data' => 'cart_to_offline'],
-            ],
-            [
-                ['text' => $textbotlang['users']['Balance']['Back-Balance'], 'callback_data' => 'back'],
-            ]
-        ]
-    ]);
-    
-    sendmessage($from_id, sprintf($textbotlang['users']['Balance']['Payment-Method'], $formatted_price), $confirm_payment_keyboard, 'HTML');
+    $formatted_amount = number_format($text);
+    sendmessage($from_id, sprintf($textbotlang['users']['Balance']['confirm_charge_amount'], $formatted_amount), $step_payment, 'HTML');
     step('get_step_payment', $from_id);
 } elseif ($user['step'] == "get_step_payment") {
     if ($datain == "cart_to_offline") {

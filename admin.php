@@ -846,24 +846,6 @@ if (preg_match('/Confirm_pay_(\w+)/', $datain, $dataget)) {
         );
         return;
     }
-    
-    // قبل از اینکه پرداخت تایید شود، بررسی می‌کنیم آیا این کاربر اخیراً پرداختی با همین مبلغ داشته است
-    $stmt = $pdo->prepare("SELECT * FROM Payment_report WHERE id_user = ? AND price = ? AND payment_Status = 'paid' AND time > DATE_SUB(NOW(), INTERVAL 5 MINUTE)");
-    $stmt->bindParam(1, $Payment_report['id_user']);
-    $stmt->bindParam(2, $Payment_report['price']);
-    $stmt->execute();
-    
-    if($stmt->rowCount() > 0) {
-        // این تراکنش احتمالاً تکراری است - به ادمین هشدار می‌دهیم
-        telegram('answerCallbackQuery', array(
-                'callback_query_id' => $callback_query_id,
-                'text' => "⚠️ هشدار: کاربر در 5 دقیقه اخیر یک پرداخت با همین مبلغ داشته است. این احتمالاً پرداخت تکراری است. با این حال، پرداخت تایید شد.",
-                'show_alert' => true,
-                'cache_time' => 5,
-            )
-        );
-    }
-    
     DirectPayment($order_id);
     update("user","Processing_value","0", "id",$Balance_id['id']);
     update("user","Processing_value_one","0", "id",$Balance_id['id']);
@@ -878,16 +860,6 @@ if (preg_match('/Confirm_pay_(\w+)/', $datain, $dataget)) {
     if (isset($setting['Channel_Report']) &&strlen($setting['Channel_Report']) > 0) {
         sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
     }
-    
-    // ویرایش پیام برای ادمین تا نشان دهد پرداخت تایید شده است
-    $confirm_keyboard = json_encode([
-        'inline_keyboard' => [
-            [
-                ['text' => "✅ این پرداخت تایید شده است", 'callback_data' => "confirmed_payment"],
-            ]
-        ]
-    ]);
-    Editmessagetext($from_id, $message_id, $textsendrasid . "\n\n✅ این پرداخت توسط شما تایید شد.", $confirm_keyboard);
 }
 #-------------------------#
 if (preg_match('/reject_pay_(\w+)/', $datain, $datagetr)) {
