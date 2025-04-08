@@ -187,7 +187,35 @@ if ($text == $textbotlang['Admin']['Statistics']['titlebtn']) {
     $ping = sys_getloadavg();
     $ping = number_format(floatval($ping[0]),2);
     $timeacc = jdate('H:i:s', time());
-    $statisticsall = sprintf($textbotlang['Admin']['Statistics']['info'],$statistics,$Balanceall['SUM(Balance)'],$ping,$count_usertest,$invoice ,$invoicesum,$dayListSell,$sumpanel);
+
+    // دریافت موجودی حساب کارت از API
+    $card_balance = 0;
+    try {
+        $api_url = "https://api.ariana-ielts.com/pay-api.php";
+        $response = file_get_contents($api_url);
+        $data = json_decode($response, true);
+        if ($data && isset($data['balance'])) {
+            // تبدیل موجودی از ریال به تومان
+            $card_balance = number_format($data['balance'] / 10, 0);
+        } else if ($data && !empty($data['transactions'])) {
+            // اگر balance در سطح اصلی نبود، از اولین تراکنش استفاده می‌کنیم
+            $card_balance = number_format($data['transactions'][0]['balance'] / 10, 0);
+        }
+    } catch (Exception $e) {
+        error_log("خطا در دریافت موجودی کارت: " . $e->getMessage());
+    }
+
+    $statisticsall = sprintf($textbotlang['Admin']['Statistics']['info'],
+        $statistics,
+        number_format($Balanceall['SUM(Balance)']),
+        $ping,
+        $count_usertest,
+        $invoice,
+        number_format($invoicesum),
+        $dayListSell,
+        $sumpanel,
+        $card_balance
+    );
     sendmessage($from_id, $statisticsall, null, 'HTML');
 }
 
