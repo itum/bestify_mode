@@ -423,12 +423,12 @@ $textbotlang['users']['moeny']['nowpayment_api'] = "🧩 api nowpayment";
 $textbotlang['users']['moeny']['nowpayment_gateway_status'] = "🔌 وضعیت درگاه nowpayments";
 $textbotlang['users']['moeny']['carttext'] = "📊 فاکتور خرید
 
-مبلغ <code>%s</code> تومان را به کارت زیر واریز کنید.
+مبلغ <b><code>%s</code></b> تومان را به کارت زیر واریز کنید.
 
-💳 شماره کارت: <code>%s</code>
-👤 به نام: %s
-💸 مبلغ: <code>%s</code> ریال
-معادل: %s
+💳 شماره کارت: <b><code>%s</code></b>
+👤 به نام: <b>%s</b>
+💸 مبلغ: <b><code>%s</code></b> ریال
+معادل: <b>%s</b>
 
 نکات مهم:
 1- لطفا مبلغ دقیق رو به کارت بالا واریز کنید تا پرداختتون خودکار تایید بشه
