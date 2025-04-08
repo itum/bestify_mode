@@ -705,3 +705,66 @@ function check_payment_status($order_id, $expected_amount) {
         ];
     }
 }
+
+function convert_to_persian_words($number) {
+    $ones = array(
+        0 => '', 1 => 'یک', 2 => 'دو', 3 => 'سه', 4 => 'چهار', 5 => 'پنج',
+        6 => 'شش', 7 => 'هفت', 8 => 'هشت', 9 => 'نه', 10 => 'ده',
+        11 => 'یازده', 12 => 'دوازده', 13 => 'سیزده', 14 => 'چهارده', 15 => 'پانزده',
+        16 => 'شانزده', 17 => 'هفده', 18 => 'هجده', 19 => 'نوزده'
+    );
+    $tens = array(
+        2 => 'بیست', 3 => 'سی', 4 => 'چهل', 5 => 'پنجاه',
+        6 => 'شصت', 7 => 'هفتاد', 8 => 'هشتاد', 9 => 'نود'
+    );
+    $hundreds = array(
+        1 => 'صد', 2 => 'دویست', 3 => 'سیصد', 4 => 'چهارصد', 5 => 'پانصد',
+        6 => 'ششصد', 7 => 'هفتصد', 8 => 'هشتصد', 9 => 'نهصد'
+    );
+    $thousands = array(
+        1 => 'هزار', 2 => 'میلیون', 3 => 'میلیارد'
+    );
+
+    if ($number == 0) return 'صفر';
+    
+    $number = (int)str_replace(',', '', $number);
+    if ($number < 20) return $ones[$number];
+    
+    $words = array();
+    $level = 0;
+    
+    while ($number > 0) {
+        $chunk = $number % 1000;
+        if ($chunk > 0) {
+            $chunk_words = array();
+            
+            // صدگان
+            $hundreds_digit = floor($chunk / 100);
+            if ($hundreds_digit > 0) {
+                $chunk_words[] = $hundreds[$hundreds_digit];
+            }
+            
+            // دهگان و یکان
+            $remainder = $chunk % 100;
+            if ($remainder > 0) {
+                if ($remainder < 20) {
+                    $chunk_words[] = $ones[$remainder];
+                } else {
+                    $tens_digit = floor($remainder / 10);
+                    $ones_digit = $remainder % 10;
+                    $chunk_words[] = $tens[$tens_digit] . ($ones_digit > 0 ? ' و ' . $ones[$ones_digit] : '');
+                }
+            }
+            
+            $chunk_text = implode(' و ', $chunk_words);
+            if ($level > 0 && !empty($chunk_text)) {
+                $chunk_text .= ' ' . $thousands[$level];
+            }
+            array_unshift($words, $chunk_text);
+        }
+        $number = floor($number / 1000);
+        $level++;
+    }
+    
+    return implode(' و ', array_filter($words));
+}

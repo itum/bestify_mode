@@ -163,13 +163,12 @@ $PaySettingdigi = select("PaySetting", "ValuePay", "NamePay", 'digistatus',"sele
 $PaySettingaqayepardakht = select("PaySetting", "ValuePay", "NamePay", 'statusaqayepardakht',"select")['ValuePay'];
 $PaySettingperfectmoney = select("PaySetting", "ValuePay", "NamePay", 'status_perfectmoney',"select")['ValuePay'];
 $step_payment = [
-    'inline_keyboard' => []
+    'inline_keyboard' => [
+        [
+            ['text' => "بله 🆗، کارت به کارت میکنم", 'callback_data' => "cart_to_offline"]
+        ]
+    ]
 ];
-if($PaySettingcard == "oncard"){
-    $step_payment['inline_keyboard'][] = [
-        ['text' => "💳 کارت به کارت" ,'callback_data' => "cart_to_offline"],
-    ];
-}
 if($PaySettingnow == "onnowpayment"){
     $step_payment['inline_keyboard'][] = [
         ['text' => "💵 پرداخت nowpayments", 'callback_data' => "nowpayments" ]

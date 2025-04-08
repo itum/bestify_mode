@@ -2976,7 +2976,16 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         $random_amount = generate_random_amount($base_amount);
         update("user", "Processing_value", $random_amount, "id", $from_id);
         $Processing_value = number_format($random_amount);
-        $textcart = sprintf($textbotlang['users']['moeny']['carttext'],$Processing_value,$PaySetting);
+        $amount_rial = $random_amount * 10; // تبدیل به ریال
+        $amount_rial_formatted = number_format($amount_rial);
+        $amount_in_words = convert_to_persian_words($random_amount) . " تومان";
+        $textcart = sprintf($textbotlang['users']['moeny']['carttext'],
+            $Processing_value,
+            $PaySetting,
+            "مدیر سیستم", // نام صاحب حساب
+            $amount_rial_formatted,
+            $amount_in_words
+        );
         
         // اضافه کردن دکمه پرداخت کردم و ارسال تصویر فیش
         $payment_keyboard = json_encode([
@@ -2988,7 +2997,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
                     ['text' => 'ارسال تصویر فیش', 'callback_data' => "send_receipt_image"]
                 ],
                 [
-                    ['text' => $textbotlang['users']['Balance']['Back-Balance'], 'callback_data' => "back"]
+                    ['text' => '🔙 بازگشت', 'callback_data' => "backuser"]
                 ]
             ]
         ]);
@@ -3310,11 +3319,14 @@ if (preg_match('/Confirmpay_user_(\w+)_(\w+)/', $datain, $dataget)) {
             sendmessage($from_id, sprintf($textbotlang['users']['moeny']['Charged.'], number_format($amount), $randomString), $keyboard, 'HTML');
             step('home', $from_id);
         } else {
-            // پرداخت تایید نشد
-            $error_message = isset($payment_result['message']) ? $payment_result['message'] : "دلیل خطا نامشخص است";
-            sendmessage($from_id, "❌ پرداخت شما تایید نشد: {$error_message}\n\nلطفا دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.", null, 'HTML');
+            // نمایش خطا به صورت مودال
+            telegram('answerCallbackQuery', array(
+                'callback_query_id' => $callback_query_id,
+                'text' => "❌ پرداخت شما تایید نشد: تراکنشی با این مبلغ یافت نشد\n\nلطفا دوباره تلاش کنید یا با پشتیبانی تماس بگیرید.",
+                'show_alert' => true,
+                'cache_time' => 5,
+            ));
         }
-        return;
     } else if ($datain == "send_receipt_image") {
         sendmessage($from_id, $textbotlang['users']['Balance']['Send-receipt-help'], null, 'HTML');
         return;
@@ -4345,4 +4357,20 @@ elseif ($text == "/double_charge_setting") {
 }
 
 // تابع convert_numbers_to_english به functions.php منتقل شده است
+// ... existing code ...
+
+elseif ($datain == "wallet") {
+    $Balance_user = number_format($user['Balance']);
+    $text_balance = "💰 موجودی کیف پول شما: $Balance_user تومان";
+    
+    $keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "💳 افزایش موجودی", 'callback_data' => "add_Balance"],
+            ]
+        ]
+    ]);
+    
+    Editmessagetext($from_id, $message_id, $text_balance, $keyboard);
+}
 // ... existing code ...
