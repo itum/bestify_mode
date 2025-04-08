@@ -3002,6 +3002,10 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
             ]
         ]);
         
+        // لاگ اطلاعات برای اشکال‌زدایی
+        error_log("مبلغ پرداخت (تومان): {$random_amount}");
+        error_log("مبلغ پرداخت (ریال): {$amount_rial}");
+        
         sendmessage($from_id, $textcart, $payment_keyboard, 'HTML');
         step('cart_to_cart_user', $from_id);
     }

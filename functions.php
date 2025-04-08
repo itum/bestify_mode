@@ -680,10 +680,11 @@ function check_payment_status($order_id, $expected_amount) {
         if ($data && isset($data['transactions'])) {
             foreach ($data['transactions'] as $transaction) {
                 // تبدیل مبلغ از ریال به تومان (تقسیم بر 10)
-                $transaction_amount = isset($transaction['transactionAmountCredit']) ? $transaction['transactionAmountCredit'] / 10 : 0;
+                $transaction_amount_rial = isset($transaction['transactionAmountCredit']) ? $transaction['transactionAmountCredit'] : 0;
+                $transaction_amount_toman = $transaction_amount_rial / 10;
                 
-                // بررسی دقیق مبلغ transactionAmountCredit با مبلغ مورد انتظار
-                if ($transaction_amount == $expected_amount) {
+                // بررسی دقیق مبلغ با تبدیل صحیح از ریال به تومان
+                if (abs($transaction_amount_toman - $expected_amount) < 1) {  // تقریبی برای مقایسه اعداد اعشاری
                     // تراکنش یافت شد - پرداخت تایید می‌شود
                     return [
                         'status' => true,
