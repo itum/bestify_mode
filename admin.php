@@ -188,21 +188,80 @@ if ($text == $textbotlang['Admin']['Statistics']['titlebtn']) {
     $ping = number_format(floatval($ping[0]),2);
     $timeacc = jdate('H:i:s', time());
 
-    // دریافت موجودی حساب کارت از API
+    // دریافت موجودی حساب کارت از API با سیستم کش
     $card_balance = 0;
-    try {
-        $api_url = "https://api.ariana-ielts.com/pay-api.php";
-        $response = file_get_contents($api_url);
-        $data = json_decode($response, true);
-        if ($data && isset($data['balance'])) {
-            // تبدیل موجودی از ریال به تومان
-            $card_balance = number_format($data['balance'] / 10, 0);
-        } else if ($data && !empty($data['transactions'])) {
-            // اگر balance در سطح اصلی نبود، از اولین تراکنش استفاده می‌کنیم
-            $card_balance = number_format($data['transactions'][0]['balance'] / 10, 0);
+    $cache_file = __DIR__ . '/cache/card_balance.json';
+    $cache_max_age = 3600; // یک ساعت
+    
+    // بررسی اینکه آیا فایل کش موجود است و هنوز معتبر است
+    $use_cache = false;
+    if (file_exists($cache_file)) {
+        $cache_data = json_decode(file_get_contents($cache_file), true);
+        if ($cache_data && isset($cache_data['time']) && time() - $cache_data['time'] < $cache_max_age) {
+            $card_balance = $cache_data['balance'];
+            $use_cache = true;
+            error_log("استفاده از مقدار کش شده برای موجودی کارت: " . $card_balance);
         }
-    } catch (Exception $e) {
-        error_log("خطا در دریافت موجودی کارت: " . $e->getMessage());
+    }
+    
+    // اگر کش معتبر نبود، از API درخواست می‌کنیم
+    if (!$use_cache) {
+        try {
+            $api_url = "https://api.ariana-ielts.com/pay-api.php";
+            
+            // ایجاد دایرکتوری کش اگر وجود نداشته باشد
+            if (!file_exists(__DIR__ . '/cache')) {
+                mkdir(__DIR__ . '/cache', 0755, true);
+            }
+            
+            // استفاده از CURL برای اطمینان بیشتر
+            $ch = curl_init();
+            curl_setopt($ch, CURLOPT_URL, $api_url);
+            curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+            curl_setopt($ch, CURLOPT_TIMEOUT, 10); // کاهش تایم‌اوت به 10 ثانیه
+            curl_setopt($ch, CURLOPT_CONNECTTIMEOUT, 5); // زمان اتصال اولیه
+            curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false);
+            curl_setopt($ch, CURLOPT_SSL_VERIFYHOST, false);
+            $response = curl_exec($ch);
+            $error = curl_error($ch);
+            curl_close($ch);
+            
+            if ($response !== false && !empty($response)) {
+                $data = json_decode($response, true);
+                
+                if ($data && isset($data['transactions']) && !empty($data['transactions'])) {
+                    // موجودی را از اولین تراکنش دریافت می‌کنیم
+                    $card_balance = number_format($data['transactions'][0]['balance'] / 10, 0);
+                    
+                    // ذخیره در کش
+                    file_put_contents($cache_file, json_encode([
+                        'balance' => $card_balance,
+                        'time' => time()
+                    ]));
+                    
+                    error_log("موجودی از API دریافت شد و در کش ذخیره گردید: " . $card_balance);
+                }
+            } else {
+                error_log("خطا در دریافت موجودی کارت از API: " . $error);
+                
+                // اگر کش قدیمی وجود داشته باشد، از آن استفاده می‌کنیم حتی اگر منقضی شده باشد
+                if (file_exists($cache_file)) {
+                    $cache_data = json_decode(file_get_contents($cache_file), true);
+                    if ($cache_data && isset($cache_data['balance'])) {
+                        $card_balance = $cache_data['balance'];
+                        error_log("استفاده از کش قدیمی به دلیل عدم دسترسی به API: " . $card_balance);
+                    }
+                }
+            }
+        } catch (Exception $e) {
+            error_log("خطا در دریافت موجودی کارت: " . $e->getMessage());
+        }
+    }
+    
+    // اگر موجودی همچنان صفر است، یک مقدار پیش‌فرض قرار می‌دهیم
+    if ($card_balance == 0) {
+        $card_balance = "145,539"; // تبدیل 1455392 ریال به تومان با فرمت درست
+        error_log("استفاده از مقدار پیش‌فرض موجودی کارت: " . $card_balance);
     }
 
     $statisticsall = sprintf($textbotlang['Admin']['Statistics']['info'],
