@@ -3929,7 +3929,7 @@ elseif ($datain == 'search_high_usage') {
 // ... existing code ...
 
 // پردازش ورودی کاربر برای جستجوی نام نمایشی
-elseif ($user['step'] == "search_display_name") {
+elseif (isset($user['step']) && $user['step'] == "search_display_name") {
     // بازگشت از جستجو به منوی فیلترها
     if ($datain == 'search_services') {
         update("user", "step", "none", "id", $from_id);
@@ -4041,7 +4041,7 @@ elseif ($user['step'] == "search_display_name") {
 }
 
 // پردازش ورودی کاربر برای جستجوی نام کاربری
-elseif ($user['step'] == "search_username") {
+elseif (isset($user['step']) && $user['step'] == "search_username") {
     // بازگشت از جستجو به منوی فیلترها
     if ($datain == 'search_services') {
         update("user", "step", "none", "id", $from_id);
@@ -4152,7 +4152,7 @@ elseif ($user['step'] == "search_username") {
 }
 
 // پردازش ورودی کاربر برای جستجوی تاریخ
-elseif ($user['step'] == "search_date") {
+elseif (isset($user['step']) && $user['step'] == "search_date") {
     // بازگشت از جستجو به منوی فیلترها
     if ($datain == 'search_services') {
         update("user", "step", "none", "id", $from_id);
@@ -4402,25 +4402,29 @@ elseif ($datain == "wallet") {
 }
 // ... existing code ...
 
-if($userInfo['Processing_value'] == "cart_to_offline"){
+if(isset($user['Processing_value']) && $user['Processing_value'] == "cart_to_offline"){
     $PaySetting = select("PaySetting", "*" , null);
     $random_number = rand(10000, 99999);
     $stmt = $pdo->prepare("UPDATE user SET step = ?, UserActive = ? ,num_fail_pay = ?, rand_cart = ? WHERE id = ?");
     $PaySettings = select("PaySetting", "*" , null);
     $Description_vared = "&proxy";
     $Invoice_vared = select("Invoice", "*" , "number_rand" , $random_number);
-    $stmt->execute(['confirmPayment', $userInfo['UserActive'], $userInfo['num_fail_pay'] + 1, $random_number, $from_id]);
-    if($userInfo['UserActive'] == "ok"){
+    $stmt->execute(['confirmPayment', $user['UserActive'], $user['num_fail_pay'] + 1, $random_number, $from_id]);
+    if($user['UserActive'] == "ok"){
         $amount_status = "✅ کاربر فعال";
     }
     else{
         $amount_status = "❌ کاربر غیر فعال";
     }
-    $text = sprintf($textbotlang['users']['moeny']['carttext'], number_format($userInfo['Processing_value_Currency']), $PaySettings['card_number'], $PaySettings['card_number_name'], $userInfo['Processing_value_Currency'], $amount_status);
+    
+    // بررسی وجود Processing_value_Currency
+    $currency = isset($user['Processing_value_Currency']) ? $user['Processing_value_Currency'] : 0;
+    
+    $text = sprintf($textbotlang['users']['moeny']['carttext'], number_format($currency), $PaySettings['card_number'], $PaySettings['card_number_name'], $currency, $amount_status);
     sendmessage($from_id, $text, 'HTML', $shopkeyboard);
-    $text = sprintf($textbotlang['users']['moeny']['Operation'], $from_id, $from_id, "<a href='tg://user?id=$from_id'>$first_name</a>", $userInfo['Processing_value_Currency']);
+    $text = sprintf($textbotlang['users']['moeny']['Operation'], $from_id, $from_id, "<a href='tg://user?id=$from_id'>$first_name</a>", $currency);
     sendmessage($Config['Channel_Report'], $text, 'HTML', $backadmin);
     $sql = "INSERT INTO Payment_report (Id_user,amount,date,payment_method,Description,from_name,from_user,type,state,step,rand_invoice,time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$from_id, $userInfo['Processing_value_Currency'], $date, "cart to cart", $Description_vared, $first_name, "$username", "factor", "sent", "Manual charge - Card", $random_number, time()]);
+    $stmt->execute([$from_id, $currency, $date, "cart to cart", $Description_vared, $first_name, "$username", "factor", "sent", "Manual charge - Card", $random_number, time()]);
 }

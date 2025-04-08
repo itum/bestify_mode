@@ -387,118 +387,49 @@ function DirectPayment($order_id){
                 )
             );
         }
-    }else {
-        // بررسی امکان شارژ دوبرابر
+    }else{
+        // اضافه کردن بررسی شارژ دوبرابر با دو بار چک کردن
         $double_charge = false;
-        $setting = select("setting", "*");
         
         try {
-            // بررسی فعال بودن ویژگی شارژ دوبرابر
-            if(isset($setting['double_charge_status']) && $setting['double_charge_status'] == 'on') {
-                // بررسی اینکه کاربر نماینده نباشد
-                $agency_exists = $pdo->prepare("SHOW TABLES LIKE 'agency'");
-                $agency_exists->execute();
-                $agency_user = false;
+            // بررسی اول - آیا کاربر واجد شرایط شارژ دوبرابر است؟
+            $stmt1 = $pdo->prepare("SELECT * FROM double_charge_notifications WHERE user_id = :user_id AND UNIX_TIMESTAMP(expiry_at) > UNIX_TIMESTAMP()");
+            $stmt1->bindParam(':user_id', $Payment_report['id_user']);
+            $stmt1->execute();
+            
+            if ($stmt1->rowCount() > 0) {
+                // بررسی دوم - آیا کاربر قبلاً از شارژ دوبرابر استفاده کرده است؟
+                $stmt2 = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
+                $stmt2->bindParam(':user_id', $Payment_report['id_user']);
+                $stmt2->execute();
                 
-                if ($agency_exists->rowCount() > 0) {
-                    $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
-                    $stmt_agency->bindParam(':user_id', $Payment_report['id_user']);
-                    $stmt_agency->execute();
-                    $agency_user = $stmt_agency->rowCount() > 0;
-                }
-                
-                if(!$agency_user) {
-                    // بررسی تنظیمات حداقل تعداد خرید
-                    $min_purchase = isset($setting['double_charge_min_purchase']) ? intval($setting['double_charge_min_purchase']) : 3;
+                if ($stmt2->rowCount() == 0) {
+                    // کاربر واجد شرایط است و از شارژ دوبرابر استفاده نکرده
+                    $double_charge = true;
                     
-                    // اگر min_purchase صفر باشد، نیازی به بررسی تعداد خرید نیست
-                    $meets_purchase_requirement = ($min_purchase == 0);
+                    // ثبت استفاده کاربر از شارژ دوبرابر
+                    $stmt3 = $pdo->prepare("INSERT INTO double_charge_users (user_id, charge_amount, charge_date) VALUES (:user_id, :charge_amount, NOW())");
+                    $stmt3->bindParam(':user_id', $Payment_report['id_user']);
+                    $stmt3->bindParam(':charge_amount', $Payment_report['price']);
+                    $stmt3->execute();
                     
-                    // اگر نیاز به بررسی تعداد خرید باشد
-                    if (!$meets_purchase_requirement) {
-                        // بررسی اینکه کاربر به حداقل تعداد خرید رسیده باشد
-                        $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-                        $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                        $stmt->execute();
-                        $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
+                    // گزارش به ادمین‌ها در صورت فعال بودن گزارش
+                    if (isset($setting['admin_notification_double_charge']) && $setting['admin_notification_double_charge'] == 1) {
+                        $admin_message = "🔔 گزارش شارژ دوبرابر\n\n";
+                        $admin_message .= "کاربر: {$Balance_id['username']} (ID: {$Payment_report['id_user']})\n";
+                        $admin_message .= "مبلغ پرداختی: " . number_format($Payment_report['price']) . " تومان\n";
+                        $admin_message .= "مبلغ شارژ شده: " . number_format($Payment_report['price'] * 2) . " تومان\n";
+                        $admin_message .= "زمان: " . date('Y-m-d H:i:s');
                         
-                        $meets_purchase_requirement = ($purchase_count >= $min_purchase);
-                    }
-                    
-                    if($meets_purchase_requirement) {
-                        // بررسی وجود جدول double_charge_users
-                        $table_exists = $pdo->prepare("SHOW TABLES LIKE 'double_charge_users'");
-                        $table_exists->execute();
-                        
-                        if ($table_exists->rowCount() == 0) {
-                            // جدول وجود ندارد، آن را ایجاد می‌کنیم
-                            $create_table = "CREATE TABLE IF NOT EXISTS double_charge_users (
-                                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                                user_id varchar(500) NOT NULL,
-                                used_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin";
-                            $pdo->exec($create_table);
-                        }
-                        
-                        // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
-                        $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
-                        $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                        $stmt->execute();
-                        
-                        if($stmt->rowCount() == 0) {
-                            // بررسی مهلت زمانی استفاده از طرح
-                            $expiry_hours = isset($setting['double_charge_expiry_hours']) ? intval($setting['double_charge_expiry_hours']) : 72;
-                            $within_time_limit = true; // پیش‌فرض: در محدوده زمانی مجاز است
-                            
-                            // اگر جدول اطلاع‌رسانی وجود دارد، محدودیت زمانی را بررسی می‌کنیم
-                            $notification_table_exists = $pdo->prepare("SHOW TABLES LIKE 'double_charge_notifications'");
-                            $notification_table_exists->execute();
-                            
-                            if ($notification_table_exists->rowCount() > 0) {
-                                // بررسی اینکه آیا به کاربر اطلاع‌رسانی شده و آیا در محدوده زمانی مجاز است
-                                $stmt = $pdo->prepare("SELECT * FROM double_charge_notifications WHERE user_id = :user_id");
-                                $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                                $stmt->execute();
-                                
-                                if ($stmt->rowCount() > 0) {
-                                    $notification = $stmt->fetch(PDO::FETCH_ASSOC);
-                                    $expiry_at = strtotime($notification['expiry_at']);
-                                    $now = time();
-                                    
-                                    // بررسی اینکه آیا زمان استفاده منقضی شده یا نه
-                                    $within_time_limit = ($now <= $expiry_at);
-                                } else {
-                                    // اگر اطلاع‌رسانی نشده، نیازی به بررسی محدودیت زمانی نیست
-                                    $within_time_limit = true;
-                                }
-                            }
-                            
-                            // کاربر واجد شرایط شارژ دوبرابر است (در صورتی که در محدوده زمانی مجاز باشد)
-                            if ($within_time_limit) {
-                                $double_charge = true;
-                                
-                                // ثبت استفاده کاربر از ویژگی شارژ دوبرابر
-                                $stmt = $pdo->prepare("INSERT INTO double_charge_users (user_id) VALUES (:user_id)");
-                                $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                                $stmt->execute();
-                                
-                                // حذف رکورد اطلاع‌رسانی پس از استفاده از طرح
-                                if ($notification_table_exists->rowCount() > 0) {
-                                    $stmt = $pdo->prepare("DELETE FROM double_charge_notifications WHERE user_id = :user_id");
-                                    $stmt->bindParam(':user_id', $Payment_report['id_user']);
-                                    $stmt->execute();
-                                }
-                            } else {
-                                // مهلت استفاده از طرح تمام شده است
-                                error_log("مهلت استفاده از شارژ دوبرابر برای کاربر {$Payment_report['id_user']} به پایان رسیده است.");
-                            }
+                        foreach ($admin_ids as $admin) {
+                            sendmessage($admin, $admin_message, null, 'HTML');
                         }
                     }
                 }
             }
         } catch (PDOException $e) {
             // در صورت خطا، لاگ می‌کنیم اما ادامه می‌دهیم تا پرداخت معمولی انجام شود
-            error_log("خطا در بررسی شرایط شارژ دوبرابر: " . $e->getMessage());
+            error_log("خطا در بررسی شارژ دوبرابر: " . $e->getMessage());
             $double_charge = false;
         }
         
@@ -520,7 +451,7 @@ function DirectPayment($order_id){
         } else {
         $Payment_report['price'] = number_format($Payment_report['price'], 0);
         $format_price_cart = $Payment_report['price'];
-            $textpay = sprintf($textbotlang['users']['moeny']['Charged.'],$Payment_report['price'],$Payment_report['id_order']);
+            $textpay = sprintf($textbotlang['users']['moeny']['Charged.'],$format_price_cart,$Payment_report['id_order']);
         }
         
         if($Payment_report['Payment_Method'] == "cart to cart"){
