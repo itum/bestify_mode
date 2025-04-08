@@ -426,6 +426,7 @@ $textbotlang['users']['moeny']['carttext'] = "📊 فاکتور خرید
 مبلغ <b><code>%s</code></b> تومان را به کارت زیر واریز کنید.
 
 💳 شماره کارت: <b><code>%s</code></b>
+👤 به نام: <b>%s</b>
 💸 مبلغ: <b><code>%s</code></b> ریال
 معادل: <b>%s</b>
 
