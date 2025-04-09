@@ -3339,8 +3339,15 @@ elseif ($user['step'] == "notify_double_charge_users") {
                     $user_id = $user_record['user_id'];
                     $username = $user_record['username'];
                     
-                    // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
-                    $notification_message = "🎉 خبر خوب {$username} عزیز!
+                    // بررسی اینکه آیا قبلاً به این کاربر اطلاع‌رسانی شده است
+                    $check_notified = $pdo->prepare("SELECT * FROM double_charge_notifications WHERE user_id = :user_id");
+                    $check_notified->bindParam(':user_id', $user_id);
+                    $check_notified->execute();
+                    $already_notified = $check_notified->rowCount() > 0;
+                    
+                    if (!$already_notified) {
+                        // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
+                        $notification_message = "🎉 خبر خوب {$username} عزیز!
 
 💰 شما واجد شرایط استفاده از طرح ویژه شارژ دوبرابر هستید!
 
@@ -3355,55 +3362,59 @@ elseif ($user['step'] == "notify_double_charge_users") {
 برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 موفق باشید!";
-                    
-                    // ارسال پیام به کاربر
-                    $result = telegram('sendMessage', [
-                        'chat_id' => $user_id,
-                        'text' => $notification_message,
-                        'parse_mode' => 'HTML'
-                    ]);
-                    
-                    if (isset($result['ok']) && $result['ok']) {
-                        $success++;
                         
-                        // ثبت زمان ارسال اطلاعیه برای کاربر
-                        try {
-                            // بررسی وجود جدول
-                            $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                        // ارسال پیام به کاربر
+                        $result = telegram('sendMessage', [
+                            'chat_id' => $user_id,
+                            'text' => $notification_message,
+                            'parse_mode' => 'HTML'
+                        ]);
+                        
+                        if (isset($result['ok']) && $result['ok']) {
+                            $success++;
                             
-                            if ($check_table && $check_table->rowCount() == 0) {
-                                // جدول وجود ندارد، آن را ایجاد می‌کنیم
-                                $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
-                                    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                                    user_id varchar(500) NOT NULL,
-                                    notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                    expiry_hours INT(11) NOT NULL,
-                                    UNIQUE KEY unique_user_id (user_id)
-                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                            // ثبت زمان ارسال اطلاعیه برای کاربر
+                            try {
+                                // بررسی وجود جدول
+                                $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                                
+                                if ($check_table && $check_table->rowCount() == 0) {
+                                    // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                                    $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
+                                        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                        user_id varchar(500) NOT NULL,
+                                        notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                        expiry_hours INT(11) NOT NULL,
+                                        UNIQUE KEY unique_user_id (user_id)
+                                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                                }
+                                
+                                // محاسبه زمان انقضا
+                                $notified_at = date('Y-m-d H:i:s');
+                                $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
+                                
+                                // ثبت رکورد جدید یا بروزرسانی رکورد موجود
+                                $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
+                                                   VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
+                                                   ON DUPLICATE KEY UPDATE 
+                                                   notified_at = :notified_at,
+                                                   expiry_at = :expiry_at,
+                                                   expiry_hours = :expiry_hours");
+                                
+                                $stmt->bindParam(':user_id', $user_id);
+                                $stmt->bindParam(':notified_at', $notified_at);
+                                $stmt->bindParam(':expiry_at', $expiry_at);
+                                $stmt->bindParam(':expiry_hours', $expiry_hours);
+                                $stmt->execute();
+                                
+                            } catch (PDOException $e) {
+                                error_log("خطا در ثبت اطلاع‌رسانی شارژ دوبرابر: " . $e->getMessage());
                             }
-                            
-                            // محاسبه زمان انقضا
-                            $notified_at = date('Y-m-d H:i:s');
-                            $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
-                            
-                            // ثبت رکورد جدید یا بروزرسانی رکورد موجود
-                            $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
-                                               VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
-                                               ON DUPLICATE KEY UPDATE 
-                                               notified_at = :notified_at,
-                                               expiry_at = :expiry_at,
-                                               expiry_hours = :expiry_hours");
-                            
-                            $stmt->bindParam(':user_id', $user_id);
-                            $stmt->bindParam(':notified_at', $notified_at);
-                            $stmt->bindParam(':expiry_at', $expiry_at);
-                            $stmt->bindParam(':expiry_hours', $expiry_hours);
-                            $stmt->execute();
-                            
-                        } catch (PDOException $e) {
-                            error_log("خطا در ثبت اطلاع‌رسانی شارژ دوبرابر: " . $e->getMessage());
                         }
+                    } else {
+                        // کاربر قبلاً اطلاع‌رسانی شده است، فقط آمار را افزایش می‌دهیم
+                        $success++;
                     }
                     
                     // کمی صبر برای جلوگیری از محدودیت تلگرام
