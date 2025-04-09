@@ -3647,6 +3647,768 @@ elseif ($user['step'] == "set_display_name") {
     sendmessage($from_id, "برای مشاهده اطلاعات سرویس خود، روی دکمه زیر کلیک کنید:", $keyboardback, 'html');
 }
 
+try {
+    require_once 'admin.php';
+} catch (Exception $e) {
+    error_log("خطا در لود فایل admin.php: " . $e->getMessage());
+}
+
+if(isset($connect) && $connect) {
+    $connect->close();
+}
+
+// اضافه کردن کد پردازش جستجو و فیلتر
+if ($datain == 'search_services') {
+    // منوی گزینه‌های جستجو
+    $search_options = [
+        'inline_keyboard' => [
+            [
+                ['text' => "🔤 جستجو بر اساس نام نمایشی", 'callback_data' => 'search_by_display_name'],
+                ['text' => "👤 جستجو بر اساس نام کاربری", 'callback_data' => 'search_by_username'],
+            ],
+            [
+                ['text' => "📆 جستجو بر اساس تاریخ", 'callback_data' => 'search_by_date'],
+                ['text' => "🔴 نمایش اکانت‌های منقضی شده", 'callback_data' => 'search_expired'],
+            ],
+            [
+                ['text' => "⚠️ اکانت‌های با مصرف بالای 80%", 'callback_data' => 'search_high_usage'],
+                ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder'],
+            ],
+            [
+                ['text' => "🔙 بازگشت", 'callback_data' => 'backorder'],
+            ]
+        ]
+    ];
+    
+    Editmessagetext($from_id, $message_id, "🔎 لطفاً نوع جستجو یا فیلتر مورد نظر خود را انتخاب کنید:", json_encode($search_options));
+}
+
+// جستجو بر اساس نام نمایشی
+elseif ($datain == 'search_by_display_name') {
+    update("user", "step", "search_display_name", "id", $from_id);
+    $cancel_button = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 انصراف", 'callback_data' => 'search_services']
+            ]
+        ]
+    ]);
+    Editmessagetext($from_id, $message_id, "🔤 لطفاً نام نمایشی که می‌خواهید جستجو کنید را وارد کنید:", $cancel_button);
+}
+
+// جستجو بر اساس نام کاربری
+elseif ($datain == 'search_by_username') {
+    update("user", "step", "search_username", "id", $from_id);
+    $cancel_button = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 انصراف", 'callback_data' => 'search_services']
+            ]
+        ]
+    ]);
+    Editmessagetext($from_id, $message_id, "👤 لطفاً نام کاربری که می‌خواهید جستجو کنید را وارد کنید:", $cancel_button);
+}
+
+// جستجو بر اساس تاریخ
+elseif ($datain == 'search_by_date') {
+    update("user", "step", "search_date", "id", $from_id);
+    $cancel_button = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 انصراف", 'callback_data' => 'search_services']
+            ]
+        ]
+    ]);
+    Editmessagetext($from_id, $message_id, "📆 لطفاً تاریخ مورد نظر برای جستجو را به صورت سال/ماه/روز وارد کنید:\nمثال: 1402/09/15", $cancel_button);
+}
+
+// نمایش اکانت‌های منقضی شده
+elseif ($datain == 'search_expired') {
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌های منقضی شده
+    $expiredServices = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // بررسی اگر سرویس منقضی شده است
+                $is_expired = false;
+                $days_left = 0;
+                if (isset($DataUserOut['expire'])) {
+                    if ($DataUserOut['expire'] <= time()) {
+                        $is_expired = true;
+                    } else {
+                        $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                    }
+                }
+                
+                // اگر سرویس منقضی شده یا وضعیت آن expired است
+                if ($is_expired || $DataUserOut['status'] == 'expired') {
+                    // محاسبه حجم باقیمانده
+                    $remaining_volume = 0;
+                    $remaining_volume_text = $textbotlang['users']['unlimited'];
+                    if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                        $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                        $remaining_volume_text = formatBytes($remaining_volume);
+                    }
+                    
+                    $expiredServices[] = array(
+                        'username' => $username,
+                        'display_name' => $service['display_name'],
+                        'days_left' => $days_left,
+                        'remaining_volume' => $remaining_volume,
+                        'remaining_volume_text' => $remaining_volume_text,
+                        'days_left_text' => $textbotlang['users']['stateus']['expired'],
+                        'is_expired' => true,
+                        'status' => $DataUserOut['status']
+                    );
+                }
+            }
+        }
+    }
+    
+    // ساخت کیبورد با سرویس‌های منقضی شده
+    $keyboardlists = [
+        'inline_keyboard' => [],
+    ];
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($expiredServices as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        $service_button = [
+            'text' => "🔴 " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
+        ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($expiredServices) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
+    }
+    
+    // اضافه کردن دکمه برگشت
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به فیلترها", 'callback_data' => 'search_services']
+    ];
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    $keyboard_json = json_encode($keyboardlists);
+    Editmessagetext($from_id, $message_id, "🔴 لیست سرویس‌های منقضی شده شما:", $keyboard_json);
+    
+    if (empty($expiredServices)) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "شما هیچ سرویس منقضی شده‌ای ندارید.",
+            'show_alert' => true
+        ]);
+    }
+}
+
+// نمایش اکانت‌های با مصرف بالای 80%
+elseif ($datain == 'search_high_usage') {
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌های با مصرف بالا
+    $highUsageServices = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // محاسبه زمان باقیمانده
+                $days_left = 0;
+                if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                    $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                }
+                
+                // محاسبه درصد مصرف
+                $usage_percent = 0;
+                $remaining_volume_text = $textbotlang['users']['unlimited'];
+                $high_usage = false;
+                
+                if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                    $used_traffic = $DataUserOut['used_traffic'];
+                    $data_limit = $DataUserOut['data_limit'];
+                    $usage_percent = round(($used_traffic / $data_limit) * 100);
+                    $remaining_volume = $data_limit - $used_traffic;
+                    $remaining_volume_text = formatBytes($remaining_volume);
+                    
+                    // بررسی اگر بیش از 80% مصرف شده
+                    if ($usage_percent >= 80) {
+                        $high_usage = true;
+                    }
+                }
+                
+                // اگر مصرف بالای 80% است
+                if ($high_usage) {
+                    $highUsageServices[] = array(
+                        'username' => $username,
+                        'display_name' => $service['display_name'],
+                        'days_left' => $days_left,
+                        'usage_percent' => $usage_percent,
+                        'remaining_volume' => $remaining_volume,
+                        'remaining_volume_text' => $remaining_volume_text,
+                        'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                        'is_expired' => $days_left <= 0,
+                        'status' => $DataUserOut['status']
+                    );
+                }
+            }
+        }
+    }
+    
+    // ساخت کیبورد با سرویس‌های با مصرف بالا
+    $keyboardlists = [
+        'inline_keyboard' => [],
+    ];
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($highUsageServices as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "⚠️"; // مصرف بالا
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . " (" . $service['usage_percent'] . "%)\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
+        ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($highUsageServices) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
+    }
+    
+    // اضافه کردن دکمه برگشت
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به فیلترها", 'callback_data' => 'search_services']
+    ];
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    $keyboard_json = json_encode($keyboardlists);
+    Editmessagetext($from_id, $message_id, "⚠️ لیست سرویس‌های با مصرف بالای 80%:", $keyboard_json);
+    
+    if (empty($highUsageServices)) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "شما هیچ سرویسی با مصرف بالای 80% ندارید.",
+            'show_alert' => true
+        ]);
+    }
+}
+// ... existing code ...
+
+// پردازش ورودی کاربر برای جستجوی نام نمایشی
+elseif ($user['step'] == "search_display_name") {
+    // بازگشت از جستجو به منوی فیلترها
+    if ($datain == 'search_services') {
+        update("user", "step", "none", "id", $from_id);
+        return;
+    }
+    
+    update("user", "step", "none", "id", $from_id);
+    $search_term = $text;
+    
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها و فیلتر بر اساس نام نمایشی
+    $filteredServices = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $display_name = $service['display_name'];
+        
+        // بررسی اگر نام نمایشی شامل عبارت جستجو است
+        if ($display_name && stripos($display_name, $search_term) !== false) {
+            $location = $service['Service_location'];
+            $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+            
+            if ($marzban_list_get) {
+                $DataUserOut = $ManagePanel->DataUser($location, $username);
+                
+                if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                    // محاسبه زمان باقیمانده
+                    $days_left = 0;
+                    if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                        $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                    }
+                    
+                    // محاسبه حجم باقیمانده
+                    $remaining_volume = 0;
+                    $remaining_volume_text = $textbotlang['users']['unlimited'];
+                    if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                        $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                        $remaining_volume_text = formatBytes($remaining_volume);
+                    }
+                    
+                    // ذخیره اطلاعات
+                    $filteredServices[] = array(
+                        'username' => $username,
+                        'display_name' => $display_name,
+                        'days_left' => $days_left,
+                        'remaining_volume' => $remaining_volume,
+                        'remaining_volume_text' => $remaining_volume_text,
+                        'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                        'is_expired' => $days_left <= 0,
+                        'status' => $DataUserOut['status']
+                    );
+                }
+            }
+        }
+    }
+    
+    // ساخت کیبورد با سرویس‌های فیلتر شده
+    $keyboardlists = [
+        'inline_keyboard' => [],
+    ];
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($filteredServices as $index => $service) {
+        $display_text = $service['display_name'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
+        ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($filteredServices) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
+    }
+    
+    // اضافه کردن دکمه برگشت
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به فیلترها", 'callback_data' => 'search_services']
+    ];
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    $keyboard_json = json_encode($keyboardlists);
+    
+    if (empty($filteredServices)) {
+        sendmessage($from_id, "❌ هیچ سرویسی با نام نمایشی حاوی «" . $search_term . "» پیدا نشد.", $keyboard_json, 'html');
+    } else {
+        sendmessage($from_id, "🔍 نتایج جستجو برای نام نمایشی حاوی «" . $search_term . "»:", $keyboard_json, 'html');
+    }
+}
+
+// پردازش ورودی کاربر برای جستجوی نام کاربری
+elseif ($user['step'] == "search_username") {
+    // بازگشت از جستجو به منوی فیلترها
+    if ($datain == 'search_services') {
+        update("user", "step", "none", "id", $from_id);
+        return;
+    }
+    
+    update("user", "step", "none", "id", $from_id);
+    $search_term = $text;
+    
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها و فیلتر بر اساس نام کاربری
+    $filteredServices = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        
+        // بررسی اگر نام کاربری شامل عبارت جستجو است
+        if (stripos($username, $search_term) !== false) {
+            $location = $service['Service_location'];
+            $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+            
+            if ($marzban_list_get) {
+                $DataUserOut = $ManagePanel->DataUser($location, $username);
+                
+                if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                    // محاسبه زمان باقیمانده
+                    $days_left = 0;
+                    if (isset($DataUserOut['expire']) && $DataUserOut['expire'] > time()) {
+                        $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                    }
+                    
+                    // محاسبه حجم باقیمانده
+                    $remaining_volume = 0;
+                    $remaining_volume_text = $textbotlang['users']['unlimited'];
+                    if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                        $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                        $remaining_volume_text = formatBytes($remaining_volume);
+                    }
+                    
+                    // ذخیره اطلاعات
+                    $filteredServices[] = array(
+                        'username' => $username,
+                        'display_name' => $service['display_name'],
+                        'days_left' => $days_left,
+                        'remaining_volume' => $remaining_volume,
+                        'remaining_volume_text' => $remaining_volume_text,
+                        'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                        'is_expired' => $days_left <= 0,
+                        'status' => $DataUserOut['status']
+                    );
+                }
+            }
+        }
+    }
+    
+    // ساخت کیبورد با سرویس‌های فیلتر شده
+    $keyboardlists = [
+        'inline_keyboard' => [],
+    ];
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($filteredServices as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n⏳ " . $service['days_left_text'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
+        ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($filteredServices) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
+    }
+    
+    // اضافه کردن دکمه برگشت
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به فیلترها", 'callback_data' => 'search_services']
+    ];
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    $keyboard_json = json_encode($keyboardlists);
+    
+    if (empty($filteredServices)) {
+        sendmessage($from_id, "❌ هیچ سرویسی با نام کاربری حاوی «" . $search_term . "» پیدا نشد.", $keyboard_json, 'html');
+    } else {
+        sendmessage($from_id, "🔍 نتایج جستجو برای نام کاربری حاوی «" . $search_term . "»:", $keyboard_json, 'html');
+    }
+}
+
+// پردازش ورودی کاربر برای جستجوی تاریخ
+elseif ($user['step'] == "search_date") {
+    // بازگشت از جستجو به منوی فیلترها
+    if ($datain == 'search_services') {
+        update("user", "step", "none", "id", $from_id);
+        return;
+    }
+    
+    update("user", "step", "none", "id", $from_id);
+    $search_date = $text;
+    
+    // تبدیل تاریخ شمسی به میلادی
+    $jalali_date_parts = explode("/", $search_date);
+    if (count($jalali_date_parts) !== 3) {
+        sendmessage($from_id, "❌ فرمت تاریخ وارد شده اشتباه است. لطفاً تاریخ را به صورت سال/ماه/روز وارد کنید.", null, 'html');
+        return;
+    }
+    
+    // دریافت همه سرویس‌های کاربر
+    $stmt = $pdo->prepare("SELECT invoice.* FROM invoice WHERE id_user = :id_user AND (status = 'active' OR status = 'end_of_time' OR status = 'end_of_volume' OR status = 'sendedwarn')");
+    $stmt->bindParam(':id_user', $from_id);
+    $stmt->execute();
+    $services = $stmt->fetchAll(PDO::FETCH_ASSOC);
+    
+    // جمع‌آوری اطلاعات سرویس‌ها و فیلتر بر اساس تاریخ
+    $filteredServices = array();
+    foreach ($services as $service) {
+        $username = $service['username'];
+        $location = $service['Service_location'];
+        $marzban_list_get = select("marzban_panel", "*", "name_panel", $location, "select");
+        
+        if ($marzban_list_get) {
+            $DataUserOut = $ManagePanel->DataUser($location, $username);
+            
+            if ($DataUserOut['status'] != "Unsuccessful" && !isset($DataUserOut['msg'])) {
+                // بررسی تاریخ انقضا
+                if (isset($DataUserOut['expire'])) {
+                    $expire_date = jdate('Y/m/d', $DataUserOut['expire']);
+                    
+                    // اگر تاریخ انقضا با تاریخ جستجو شده مطابقت دارد
+                    if (stripos($expire_date, $search_date) !== false) {
+                        // محاسبه زمان باقیمانده
+                        $days_left = 0;
+                        if ($DataUserOut['expire'] > time()) {
+                            $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
+                        }
+                        
+                        // محاسبه حجم باقیمانده
+                        $remaining_volume = 0;
+                        $remaining_volume_text = $textbotlang['users']['unlimited'];
+                        if (isset($DataUserOut['data_limit']) && $DataUserOut['data_limit'] > 0) {
+                            $remaining_volume = $DataUserOut['data_limit'] - $DataUserOut['used_traffic'];
+                            $remaining_volume_text = formatBytes($remaining_volume);
+                        }
+                        
+                        // ذخیره اطلاعات
+                        $filteredServices[] = array(
+                            'username' => $username,
+                            'display_name' => $service['display_name'],
+                            'days_left' => $days_left,
+                            'remaining_volume' => $remaining_volume,
+                            'remaining_volume_text' => $remaining_volume_text,
+                            'days_left_text' => $days_left > 0 ? $days_left . " " . $textbotlang['users']['stateus']['day'] : $textbotlang['users']['stateus']['expired'],
+                            'is_expired' => $days_left <= 0,
+                            'status' => $DataUserOut['status'],
+                            'expire_date' => $expire_date
+                        );
+                    }
+                }
+            }
+        }
+    }
+    
+    // ساخت کیبورد با سرویس‌های فیلتر شده
+    $keyboardlists = [
+        'inline_keyboard' => [],
+    ];
+    
+    // ساخت کیبورد دو ستونی
+    $row = [];
+    foreach ($filteredServices as $index => $service) {
+        $display_text = $service['display_name'] ? $service['display_name'] : $service['username'];
+        
+        // افزودن آیکون‌های مناسب برای وضعیت سرویس
+        $status_icon = "🟢"; // فعال
+        if ($service['is_expired']) {
+            $status_icon = "🔴"; // منقضی شده
+        } elseif ($service['days_left'] <= 3) {
+            $status_icon = "🟠"; // نزدیک به انقضا
+        }
+        
+        $service_button = [
+            'text' => $status_icon . " " . $display_text . "\n📆 " . $service['expire_date'] . " | 💾 " . $service['remaining_volume_text'],
+            'callback_data' => "product_" . $service['username']
+        ];
+        
+        // اضافه کردن به ردیف فعلی
+        $row[] = $service_button;
+        
+        // هر 2 دکمه یک ردیف جدید ایجاد می‌کنیم
+        if (count($row) == 2 || $index == count($filteredServices) - 1) {
+            $keyboardlists['inline_keyboard'][] = $row;
+            $row = []; // شروع ردیف جدید
+        }
+    }
+    
+    // اضافه کردن دکمه برگشت
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔙 بازگشت به فیلترها", 'callback_data' => 'search_services']
+    ];
+    $keyboardlists['inline_keyboard'][] = [
+        ['text' => "🔄 نمایش همه سرویس‌ها", 'callback_data' => 'backorder']
+    ];
+    
+    $keyboard_json = json_encode($keyboardlists);
+    
+    if (empty($filteredServices)) {
+        sendmessage($from_id, "❌ هیچ سرویسی با تاریخ انقضای «" . $search_date . "» پیدا نشد.", $keyboard_json, 'html');
+    } else {
+        sendmessage($from_id, "🔍 نتایج جستجو برای سرویس‌های منقضی شده در تاریخ «" . $search_date . "»:", $keyboard_json, 'html');
+    }
+}
+
+// پردازش نام نمایشی
+if (preg_match('/display_name_(\w+)/', $datain, $dataget)) {
+// ... existing code ...
+}
+
+elseif ($datain == "paypanel") {
+    $payment_markup = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => '50,000 تومان', 'callback_data' => 'add_balance_50000'],
+                ['text' => '75,000 تومان', 'callback_data' => 'add_balance_75000'],
+            ],
+            [
+                ['text' => '100,000 تومان', 'callback_data' => 'add_balance_100000'],
+                ['text' => '150,000 تومان', 'callback_data' => 'add_balance_150000'],
+            ],
+            [
+                ['text' => '200,000 تومان', 'callback_data' => 'add_balance_200000'],
+                ['text' => '500,000 تومان', 'callback_data' => 'add_balance_500000'],
+            ],
+            [
+                ['text' => '1,000,000 تومان', 'callback_data' => 'add_balance_1000000'],
+            ],
+            [
+                ['text' => '🔢 مبلغ دلخواه', 'callback_data' => 'add_balance_custom'],
+            ],
+            [
+                ['text' => 'بازگشت', 'callback_data' => 'backuser'],
+            ]
+        ]
+    ]);
+    
+    $text = "لطفا مبلغ مورد نظر برای شارژ حسابتون رو انتخاب کنید:";
+    
+    if(isset($message_id)) {
+        Editmessagetext($from_id, $message_id, $text, $payment_markup);
+    } else {
+        sendmessage($from_id, $text, $payment_markup);
+    }
+}
+elseif ($datain == "add_balance_custom") {
+    // ایجاد یک کیبورد اینلاین برای دکمه برگشت
+    $back_inline_keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "🔙 بازگشت", 'callback_data' => 'backuser']
+            ]
+        ]
+    ]);
+    
+    Editmessagetext($from_id, $message_id, "💰 وارد کردن مبلغ دلخواه
+
+✏️ لطفا مبلغ مورد نظر خود را به تومان وارد کنید.
+
+⚠️ نکات مهم:
+• حداقل مبلغ مجاز: 5,000 تومان
+• حداکثر مبلغ مجاز: 10,000,000 تومان
+• فقط عدد وارد کنید (بدون ویرگول یا نقطه)
+• اعداد فارسی و عربی نیز قابل قبول هستند
+
+🔄 مثال صحیح: 50000", $back_inline_keyboard, 'HTML');
+    step('getprice', $from_id);
+}
+elseif (preg_match('/^add_balance_(\d+)$/', $datain, $matches)) {
+    $amount = $matches[1];
+    
+    // Проверка допустимой суммы (от 5,000 до 10,000,000 туманов)
+    if ($amount < 5000 || $amount > 10000000) {
+        telegram('answerCallbackQuery', [
+            'callback_query_id' => $callback_query_id,
+            'text' => "مبلغ باید بین 5,000 تا 10,000,000 تومان باشد.",
+            'show_alert' => true
+        ]);
+        return;
+    }
+    
+    // Сохранение суммы для дальнейшей обработки
+    update("user", "Processing_value", $amount, "id", $from_id);
+    
+    // Отображение выбора метода оплаты
+    $formatted_amount = number_format($amount);
+    Editmessagetext($from_id, $message_id, sprintf($textbotlang['users']['Balance']['confirm_charge_amount'], $formatted_amount), $step_payment);
+    step('get_step_payment', $from_id);
+}
+
+elseif ($text == "/double_charge_setting") {
+    if (!in_array($from_id, $admin_ids)) return;
+    
+    $double_charge_keyboard = json_encode([
+        'keyboard' => [
+            [['text' => "✅ اعطای قابلیت به یک کاربر"]],
+            [['text' => "🔔 اطلاع‌رسانی همگانی"]],
+            [['text' => "⏰ یادآوری به کاربران نزدیک به پایان مهلت"]],
+            [['text' => "🧩 تنظیمات پیشرفته دابل شارژ"]],
+            [['text' => $textbotlang['Admin']['Back-Adminment']]]
+        ],
+        'resize_keyboard' => true
+    ]);
+    
+    sendmessage($from_id, "💰 تنظیمات بخش شارژ دوبرابر
+
+از این بخش می‌توانید تنظیمات مربوط به شارژ دوبرابر را مدیریت کنید:
+
+✅ اعطای قابلیت به یک کاربر: فعال‌سازی قابلیت شارژ دوبرابر برای یک کاربر خاص
+🔔 اطلاع‌رسانی همگانی: ارسال پیام به همه کاربران در مورد فعال بودن شارژ دوبرابر
+⏰ یادآوری به کاربران: ارسال یادآوری به کاربرانی که نزدیک به پایان مهلت هستند
+🧩 تنظیمات پیشرفته: سایر تنظیمات مربوط به کارکرد شارژ دوبرابر", $double_charge_keyboard, 'HTML');
+}
+
+// تابع convert_numbers_to_english به functions.php منتقل شده است
+// ... existing code ...
+
+elseif ($datain == "wallet") {
+    $Balance_user = number_format($user['Balance']);
+    $text_balance = "💰 موجودی کیف پول شما: $Balance_user تومان";
+    
+    $keyboard = json_encode([
+        'inline_keyboard' => [
+            [
+                ['text' => "💳 افزایش موجودی", 'callback_data' => "add_Balance"],
+            ]
+        ]
+    ]);
+    
+    Editmessagetext($from_id, $message_id, $text_balance, $keyboard);
+}
+// ... existing code ...
+
 if(isset($userInfo) && $userInfo !== null && $userInfo['Processing_value'] == "cart_to_offline"){
     $PaySetting = select("PaySetting", "*" , null);
     $random_number = rand(10000, 99999);
@@ -3654,22 +4416,24 @@ if(isset($userInfo) && $userInfo !== null && $userInfo['Processing_value'] == "c
     $PaySettings = select("PaySetting", "*" , null);
     $Description_vared = "&proxy";
     $Invoice_vared = select("Invoice", "*" , "number_rand" , $random_number);
-    $stmt->execute(['confirmPayment', $user['UserActive'], $user['num_fail_pay'] + 1, $random_number, $from_id]);
-    if($user['UserActive'] == "ok"){
+    $stmt->execute(['confirmPayment', $userInfo['UserActive'], $userInfo['num_fail_pay'] + 1, $random_number, $from_id]);
+    if($userInfo['UserActive'] == "ok"){
         $amount_status = "✅ کاربر فعال";
     }
     else{
         $amount_status = "❌ کاربر غیر فعال";
     }
-    
-    // بررسی وجود Processing_value_Currency
-    $currency = isset($userInfo['Processing_value_Currency']) ? $userInfo['Processing_value_Currency'] : 0;
-    
-    $text = sprintf($textbotlang['users']['moeny']['carttext'], number_format($currency), $PaySettings['card_number'], $PaySettings['card_number_name'], $currency, $amount_status);
+    $text = sprintf($textbotlang['users']['moeny']['carttext'], number_format($userInfo['Processing_value_Currency']), $PaySettings['card_number'], $PaySettings['card_number_name'], $userInfo['Processing_value_Currency'], $amount_status);
     sendmessage($from_id, $text, 'HTML', $shopkeyboard);
-    $text = sprintf($textbotlang['users']['moeny']['Operation'], $from_id, $from_id, "<a href='tg://user?id=$from_id'>$first_name</a>", $currency);
+    $text = sprintf($textbotlang['users']['moeny']['Operation'], $from_id, $from_id, "<a href='tg://user?id=$from_id'>$first_name</a>", $userInfo['Processing_value_Currency']);
     sendmessage($Config['Channel_Report'], $text, 'HTML', $backadmin);
     $sql = "INSERT INTO Payment_report (Id_user,amount,date,payment_method,Description,from_name,from_user,type,state,step,rand_invoice,time) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)";
     $stmt = $pdo->prepare($sql);
-    $stmt->execute([$from_id, $currency, $date, "cart to cart", $Description_vared, $first_name, "$username", "factor", "sent", "Manual charge - Card", $random_number, time()]);
+    $stmt->execute([$from_id, $userInfo['Processing_value_Currency'], $date, "cart to cart", $Description_vared, $first_name, "$username", "factor", "sent", "Manual charge - Card", $random_number, time()]);
 }
+
+$context = stream_context_create([
+    'http' => [
+        'timeout' => 15, // افزایش به ۱۵ ثانیه
+    ]
+]);

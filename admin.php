@@ -3188,19 +3188,9 @@ elseif ($text == "📋 لیست کاربران مشمول شارژ دوبراب�
         $eligible_users = [];
         $total_eligible = 0;
         
-        // کوئری برای یافتن تمام کاربران فعال
+        // کوئری برای یافتن تمام کاربران
         $users_query = $pdo->query("SELECT * FROM user WHERE User_Status = 'Active'");
-        if ($users_query === false) {
-            throw new PDOException("خطا در بررسی کاربران فعال: " . $pdo->errorInfo()[2]);
-        }
-        
         $users = $users_query->fetchAll(PDO::FETCH_ASSOC);
-        
-        if (empty($users)) {
-            // اگر هیچ کاربر فعالی نباشد
-            sendmessage($from_id, "❌ هیچ کاربر فعالی در سیستم وجود ندارد.", $double_charge_keyboard, 'HTML');
-            return;
-        }
         
         foreach ($users as $user) {
             $user_id = $user['id'];
@@ -3246,55 +3236,29 @@ elseif ($text == "📋 لیست کاربران مشمول شارژ دوبراب�
                             $eligible_users[] = $user_info;
                             $total_eligible++;
                         }
-                    } else {
-                        // اگر جدول double_charge_users وجود نداشت، همه کاربران واجد شرایط هستند
-                        $user_info = [
-                            'id' => $user_id,
-                            'username' => !empty($user['username']) ? $user['username'] : 'بدون نام کاربری'
-                        ];
-                        $eligible_users[] = $user_info;
-                        $total_eligible++;
                     }
                 }
             }
         }
-        
-        // فعال سازی یا شروع مجدد سشن اگر فعال نیست
-        if (session_status() == PHP_SESSION_NONE) {
-            @session_start();
-        }
-        
-        // ذخیره لیست کاربران در متغیر سشن
-        $_SESSION['eligible_users'] = $eligible_users;
         
         // ارسال نتایج به ادمین
         if ($total_eligible > 0) {
             $list_text = "📋 لیست کاربران مشمول شارژ دوبرابر:\n\n";
             $list_text .= "🔹 تعداد کل: $total_eligible کاربر\n\n";
             
-            // بررسی تعداد کاربران برای نمایش
-            $max_users_to_display = 50; // حداکثر تعداد کاربران برای نمایش
             $counter = 1;
-            
             foreach ($eligible_users as $user) {
-                if ($counter <= $max_users_to_display) {
-                    $list_text .= "$counter. شناسه: {$user['id']} | نام: {$user['username']}\n";
-                }
+                $list_text .= "$counter. شناسه: {$user['id']} | نام: {$user['username']}\n";
                 $counter++;
                 
                 // ارسال پیام به صورت بخش‌بندی شده برای جلوگیری از خطای پیام طولانی
-                if (($counter % 20 == 0 && $counter <= $max_users_to_display) || $counter > $total_eligible && $counter <= $max_users_to_display) {
+                if ($counter % 20 == 0 || $counter > $total_eligible) {
                     sendmessage($from_id, $list_text, null, 'HTML');
                     $list_text = "";
                 }
             }
             
-            // اگر تعداد کاربران بیشتر از حد نمایش است
-            if ($total_eligible > $max_users_to_display) {
-                $list_text = "⚠️ به دلیل تعداد زیاد کاربران، فقط $max_users_to_display کاربر اول نمایش داده شد.\n";
-                $list_text .= "تعداد کل کاربران مشمول: $total_eligible نفر";
-                sendmessage($from_id, $list_text, null, 'HTML');
-            } else if (!empty($list_text)) {
+            if (!empty($list_text)) {
                 sendmessage($from_id, $list_text, null, 'HTML');
             }
             
@@ -3307,123 +3271,36 @@ elseif ($text == "📋 لیست کاربران مشمول شارژ دوبراب�
                 'resize_keyboard' => true
             ]);
             
-            sendmessage($from_id, "✅ لیست کاربران مشمول با موفقیت ساخته شد.\n\nآیا می‌خواهید به کاربران مشمول اطلاع‌رسانی کنید؟", $notify_keyboard, 'HTML');
+            sendmessage($from_id, "آیا می‌خواهید به کاربران مشمول اطلاع‌رسانی کنید؟", $notify_keyboard, 'HTML');
             step('notify_double_charge_users', $from_id);
+            
+            // ذخیره لیست کاربران در متغیر سشن
+            $_SESSION['eligible_users'] = $eligible_users;
         } else {
             sendmessage($from_id, "❌ هیچ کاربری واجد شرایط شارژ دوبرابر نیست.", $double_charge_keyboard, 'HTML');
         }
     } catch (PDOException $e) {
         sendmessage($from_id, "خطا در بررسی کاربران: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
-    } catch (Exception $e) {
-        sendmessage($from_id, "خطای سیستمی: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
     }
 }
 
 // رسیدگی به مرحله اطلاع‌رسانی
 elseif ($user['step'] == "notify_double_charge_users") {
     if ($text == "📢 اطلاع‌رسانی به کاربران مشمول") {
-        try {
+        if (isset($_SESSION['eligible_users']) && count($_SESSION['eligible_users']) > 0) {
+            $count = 0;
+            $success = 0;
+            
             // دریافت مهلت زمانی از تنظیمات
             $setting = select("setting", "*");
             $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
             
-            // بررسی وجود جدول double_charge_notifications
-            $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
-            if ($check_table && $check_table->rowCount() == 0) {
-                // ایجاد جدول اگر وجود نداشته باشد
-                $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
-                    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                    user_id varchar(500) NOT NULL,
-                    notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                    expiry_hours INT(11) NOT NULL,
-                    UNIQUE KEY unique_user_id (user_id)
-                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
-            }
-            
-            // بازیابی لیست کاربران از دیتابیس به جای سشن
-            $min_purchase = intval($setting['double_charge_min_purchase']);
-            $eligible_users = [];
-            
-            // کوئری برای یافتن تمام کاربران فعال
-            $users_query = $pdo->query("SELECT * FROM user WHERE User_Status = 'Active'");
-            if ($users_query === false) {
-                throw new PDOException("خطا در بررسی کاربران فعال: " . $pdo->errorInfo()[2]);
-            }
-            
-            $users = $users_query->fetchAll(PDO::FETCH_ASSOC);
-            
-            if (empty($users)) {
-                sendmessage($from_id, "❌ هیچ کاربر فعالی در سیستم وجود ندارد.", $double_charge_keyboard, 'HTML');
-                return;
-            }
-            
-            foreach ($users as $user) {
-                $user_id = $user['id'];
-                
-                // بررسی اینکه کاربر نماینده نباشد
-                $agency_user = false;
-                $check_agency_table = $pdo->query("SHOW TABLES LIKE 'agency'");
-                if ($check_agency_table && $check_agency_table->rowCount() > 0) {
-                    $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
-                    $stmt_agency->bindParam(':user_id', $user_id);
-                    $stmt_agency->execute();
-                    $agency_user = $stmt_agency->rowCount() > 0;
-                }
-                
-                if (!$agency_user) {
-                    // بررسی تعداد خرید کاربر
-                    $meets_purchase_requirement = ($min_purchase == 0); // اگر min_purchase صفر باشد، نیازی به بررسی تعداد خرید نیست
-                    
-                    if (!$meets_purchase_requirement) {
-                        $stmt = $pdo->prepare("SELECT COUNT(*) as purchase_count FROM invoice WHERE id_user = :user_id AND Status = 'active'");
-                        $stmt->bindParam(':user_id', $user_id);
-                        $stmt->execute();
-                        $purchase_count = $stmt->fetch(PDO::FETCH_ASSOC)['purchase_count'];
-                        
-                        $meets_purchase_requirement = ($purchase_count >= $min_purchase);
-                    }
-                    
-                    if ($meets_purchase_requirement) {
-                        // بررسی اینکه کاربر قبلاً از این ویژگی استفاده نکرده باشد
-                        $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
-                        if ($check_table && $check_table->rowCount() > 0) {
-                            $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
-                            $stmt->bindParam(':user_id', $user_id);
-                            $stmt->execute();
-                            
-                            if ($stmt->rowCount() == 0) {
-                                $user_info = [
-                                    'id' => $user_id,
-                                    'username' => !empty($user['username']) ? $user['username'] : 'بدون نام کاربری'
-                                ];
-                                $eligible_users[] = $user_info;
-                            }
-                        } else {
-                            $user_info = [
-                                'id' => $user_id,
-                                'username' => !empty($user['username']) ? $user['username'] : 'بدون نام کاربری'
-                            ];
-                            $eligible_users[] = $user_info;
-                        }
-                    }
-                }
-            }
-            
-            if (empty($eligible_users)) {
-                sendmessage($from_id, "❌ هیچ کاربری واجد شرایط شارژ دوبرابر نیست.", $double_charge_keyboard, 'HTML');
-                return;
-            }
-            
-            $count = 0;
-            $success = 0;
-            
-            foreach ($eligible_users as $user_info) {
+            foreach ($_SESSION['eligible_users'] as $user_info) {
                 $count++;
                 $user_id = $user_info['id'];
                 $username = $user_info['username'];
                 
-                // پیام اطلاع‌رسانی
+                // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
                 $notification_message = "🎉 خبر خوب {$username} عزیز!
 
 💰 شما واجد شرایط استفاده از طرح ویژه شارژ دوبرابر هستید!
@@ -3436,7 +3313,7 @@ elseif ($user['step'] == "notify_double_charge_users") {
 
 🔴 نکته مهم: این فرصت فقط یک‌بار قابل استفاده است، پس حتماً از آن به بهترین شکل بهره‌مند شوید.
 
-برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 افزایش موجودی» را انتخاب نمایید.
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 موفق باشید!";
                 
@@ -3452,23 +3329,36 @@ elseif ($user['step'] == "notify_double_charge_users") {
                     
                     // ثبت زمان ارسال اطلاعیه برای کاربر
                     try {
+                        // بررسی وجود جدول
+                        $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                        
+                        if ($check_table && $check_table->rowCount() == 0) {
+                            // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                            $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
+                                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                user_id varchar(500) NOT NULL,
+                                notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                expiry_hours INT(11) NOT NULL
+                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                        }
+                        
+                        // محاسبه زمان انقضا
                         $notified_at = date('Y-m-d H:i:s');
                         $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
                         
+                        // ثبت رکورد جدید یا بروزرسانی رکورد موجود
                         $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
                                            VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
                                            ON DUPLICATE KEY UPDATE 
-                                           notified_at = :notified_at_update,
-                                           expiry_at = :expiry_at_update,
-                                           expiry_hours = :expiry_hours_update");
+                                           notified_at = :notified_at,
+                                           expiry_at = :expiry_at,
+                                           expiry_hours = :expiry_hours");
                         
                         $stmt->bindParam(':user_id', $user_id);
                         $stmt->bindParam(':notified_at', $notified_at);
                         $stmt->bindParam(':expiry_at', $expiry_at);
                         $stmt->bindParam(':expiry_hours', $expiry_hours);
-                        $stmt->bindParam(':notified_at_update', $notified_at);
-                        $stmt->bindParam(':expiry_at_update', $expiry_at);
-                        $stmt->bindParam(':expiry_hours_update', $expiry_hours);
                         $stmt->execute();
                         
                     } catch (PDOException $e) {
@@ -3480,22 +3370,18 @@ elseif ($user['step'] == "notify_double_charge_users") {
                 sleep(1);
             }
             
-            // ارسال گزارش به ادمین
-            $report_message = "📊 گزارش ارسال اطلاعیه شارژ دوبرابر:\n\n";
-            $report_message .= "🔹 تعداد کل کاربران: $count\n";
-            $report_message .= "✅ ارسال موفق: $success\n";
-            $report_message .= "❌ ارسال ناموفق: " . ($count - $success);
-            
-            sendmessage($from_id, $report_message, $double_charge_keyboard, 'HTML');
+            sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success) . "\n\n⏱ مهلت استفاده: {$expiry_hours} ساعت", $double_charge_keyboard, 'HTML');
             step('none', $from_id);
             
-        } catch (PDOException $e) {
-            sendmessage($from_id, "❌ خطا در ارسال پیام: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
-            step('none', $from_id);
-        } catch (Exception $e) {
-            sendmessage($from_id, "❌ خطای سیستمی: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+            // پاک کردن سشن
+            unset($_SESSION['eligible_users']);
+        } else {
+            sendmessage($from_id, "❌ لیست کاربران مشمول در دسترس نیست. لطفاً دوباره لیست را بررسی کنید.", $double_charge_keyboard, 'HTML');
             step('none', $from_id);
         }
+    } else {
+        sendmessage($from_id, "به منوی مدیریت بازگشتید.", $keyboard, 'HTML');
+        step('none', $from_id);
     }
 }
 // اضافه کردن بخش تنظیم مهلت استفاده
@@ -3630,7 +3516,7 @@ elseif ($user['step'] == "double_charge_reminder_option") {
 
 🔴 توجه: این فرصت فقط یک‌بار قابل استفاده است و پس از پایان مهلت، تکرار نخواهد شد.
 
-برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 افزایش موجودی» را انتخاب نمایید.
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 عجله کنید!";
                     
@@ -3726,7 +3612,7 @@ try {
 
 🔴 توجه: این فرصت فقط یک‌بار قابل استفاده است و پس از پایان مهلت، تکرار نخواهد شد.
 
-برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 افزایش موجودی» را انتخاب نمایید.
+برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 عجله کنید!";
             
@@ -3801,12 +3687,3 @@ crontab -e
 
 
 // تابع convert_numbers_to_english به functions.php منتقل شده است
-
-#-------------------------------------------------
-// کد مربوط به ارسال پیام به itman1 حذف شد
-// ... existing code ...
-
-// بخش مربوط به دکمه مدیریت پنل ادمین
-if($text == $textbotlang['Admin']['commendadmin']){
-    sendmessage($from_id, $textbotlang['Admin']['lockhome'] , $keyboardadmin, 'HTML');
-}
