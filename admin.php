@@ -3272,10 +3272,42 @@ elseif ($text == "📋 لیست کاربران مشمول شارژ دوبراب�
             ]);
             
             sendmessage($from_id, "آیا می‌خواهید به کاربران مشمول اطلاع‌رسانی کنید؟", $notify_keyboard, 'HTML');
-            step('notify_double_charge_users', $from_id);
             
-            // ذخیره لیست کاربران در متغیر سشن
-            $_SESSION['eligible_users'] = $eligible_users;
+            // ذخیره لیست کاربران در دیتابیس به صورت موقت
+            try {
+                // بررسی وجود جدول موقت برای ذخیره لیست کاربران
+                $check_table = $pdo->query("SHOW TABLES LIKE 'temp_eligible_users'");
+                if ($check_table && $check_table->rowCount() == 0) {
+                    // ایجاد جدول موقت اگر وجود نداشته باشد
+                    $pdo->exec("CREATE TABLE IF NOT EXISTS temp_eligible_users (
+                        id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                        admin_id varchar(50) NOT NULL,
+                        user_id varchar(50) NOT NULL,
+                        username varchar(200),
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE utf8mb4_bin");
+                }
+                
+                // پاک کردن رکوردهای قبلی مربوط به این ادمین
+                $stmt = $pdo->prepare("DELETE FROM temp_eligible_users WHERE admin_id = :admin_id");
+                $stmt->bindParam(':admin_id', $from_id);
+                $stmt->execute();
+                
+                // ذخیره لیست کاربران جدید
+                $insert_stmt = $pdo->prepare("INSERT INTO temp_eligible_users (admin_id, user_id, username) VALUES (:admin_id, :user_id, :username)");
+                
+                foreach ($eligible_users as $user) {
+                    $insert_stmt->bindParam(':admin_id', $from_id);
+                    $insert_stmt->bindParam(':user_id', $user['id']);
+                    $insert_stmt->bindParam(':username', $user['username']);
+                    $insert_stmt->execute();
+                }
+                
+                step('notify_double_charge_users', $from_id);
+            } catch (PDOException $e) {
+                sendmessage($from_id, "خطا در ذخیره لیست کاربران: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
+                step('none', $from_id);
+            }
         } else {
             sendmessage($from_id, "❌ هیچ کاربری واجد شرایط شارژ دوبرابر نیست.", $double_charge_keyboard, 'HTML');
         }
@@ -3287,21 +3319,28 @@ elseif ($text == "📋 لیست کاربران مشمول شارژ دوبراب�
 // رسیدگی به مرحله اطلاع‌رسانی
 elseif ($user['step'] == "notify_double_charge_users") {
     if ($text == "📢 اطلاع‌رسانی به کاربران مشمول") {
-        if (isset($_SESSION['eligible_users']) && count($_SESSION['eligible_users']) > 0) {
-            $count = 0;
-            $success = 0;
+        try {
+            // بازیابی لیست کاربران از دیتابیس
+            $stmt = $pdo->prepare("SELECT * FROM temp_eligible_users WHERE admin_id = :admin_id");
+            $stmt->bindParam(':admin_id', $from_id);
+            $stmt->execute();
+            $eligible_users = $stmt->fetchAll(PDO::FETCH_ASSOC);
             
-            // دریافت مهلت زمانی از تنظیمات
-            $setting = select("setting", "*");
-            $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
-            
-            foreach ($_SESSION['eligible_users'] as $user_info) {
-                $count++;
-                $user_id = $user_info['id'];
-                $username = $user_info['username'];
+            if (count($eligible_users) > 0) {
+                $count = 0;
+                $success = 0;
                 
-                // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
-                $notification_message = "🎉 خبر خوب {$username} عزیز!
+                // دریافت مهلت زمانی از تنظیمات
+                $setting = select("setting", "*");
+                $expiry_hours = isset($setting['double_charge_expiry_hours']) ? $setting['double_charge_expiry_hours'] : 72;
+                
+                foreach ($eligible_users as $user_record) {
+                    $count++;
+                    $user_id = $user_record['user_id'];
+                    $username = $user_record['username'];
+                    
+                    // پیام اطلاع‌رسانی با اضافه کردن مهلت زمانی
+                    $notification_message = "🎉 خبر خوب {$username} عزیز!
 
 💰 شما واجد شرایط استفاده از طرح ویژه شارژ دوبرابر هستید!
 
@@ -3316,67 +3355,74 @@ elseif ($user['step'] == "notify_double_charge_users") {
 برای شارژ حساب، کافیست به منوی اصلی بات مراجعه کرده و گزینه «💰 شارژ حساب» را انتخاب نمایید.
 
 🚀 موفق باشید!";
-                
-                // ارسال پیام به کاربر
-                $result = telegram('sendMessage', [
-                    'chat_id' => $user_id,
-                    'text' => $notification_message,
-                    'parse_mode' => 'HTML'
-                ]);
-                
-                if (isset($result['ok']) && $result['ok']) {
-                    $success++;
                     
-                    // ثبت زمان ارسال اطلاعیه برای کاربر
-                    try {
-                        // بررسی وجود جدول
-                        $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                    // ارسال پیام به کاربر
+                    $result = telegram('sendMessage', [
+                        'chat_id' => $user_id,
+                        'text' => $notification_message,
+                        'parse_mode' => 'HTML'
+                    ]);
+                    
+                    if (isset($result['ok']) && $result['ok']) {
+                        $success++;
                         
-                        if ($check_table && $check_table->rowCount() == 0) {
-                            // جدول وجود ندارد، آن را ایجاد می‌کنیم
-                            $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
-                                id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                                user_id varchar(500) NOT NULL,
-                                notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                expiry_hours INT(11) NOT NULL
-                            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                        // ثبت زمان ارسال اطلاعیه برای کاربر
+                        try {
+                            // بررسی وجود جدول
+                            $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_notifications'");
+                            
+                            if ($check_table && $check_table->rowCount() == 0) {
+                                // جدول وجود ندارد، آن را ایجاد می‌کنیم
+                                $pdo->exec("CREATE TABLE IF NOT EXISTS double_charge_notifications (
+                                    id INT(6) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                                    user_id varchar(500) NOT NULL,
+                                    notified_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    expiry_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                                    expiry_hours INT(11) NOT NULL,
+                                    UNIQUE KEY unique_user_id (user_id)
+                                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_bin");
+                            }
+                            
+                            // محاسبه زمان انقضا
+                            $notified_at = date('Y-m-d H:i:s');
+                            $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
+                            
+                            // ثبت رکورد جدید یا بروزرسانی رکورد موجود
+                            $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
+                                               VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
+                                               ON DUPLICATE KEY UPDATE 
+                                               notified_at = :notified_at,
+                                               expiry_at = :expiry_at,
+                                               expiry_hours = :expiry_hours");
+                            
+                            $stmt->bindParam(':user_id', $user_id);
+                            $stmt->bindParam(':notified_at', $notified_at);
+                            $stmt->bindParam(':expiry_at', $expiry_at);
+                            $stmt->bindParam(':expiry_hours', $expiry_hours);
+                            $stmt->execute();
+                            
+                        } catch (PDOException $e) {
+                            error_log("خطا در ثبت اطلاع‌رسانی شارژ دوبرابر: " . $e->getMessage());
                         }
-                        
-                        // محاسبه زمان انقضا
-                        $notified_at = date('Y-m-d H:i:s');
-                        $expiry_at = date('Y-m-d H:i:s', strtotime("+{$expiry_hours} hours"));
-                        
-                        // ثبت رکورد جدید یا بروزرسانی رکورد موجود
-                        $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
-                                           VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
-                                           ON DUPLICATE KEY UPDATE 
-                                           notified_at = :notified_at,
-                                           expiry_at = :expiry_at,
-                                           expiry_hours = :expiry_hours");
-                        
-                        $stmt->bindParam(':user_id', $user_id);
-                        $stmt->bindParam(':notified_at', $notified_at);
-                        $stmt->bindParam(':expiry_at', $expiry_at);
-                        $stmt->bindParam(':expiry_hours', $expiry_hours);
-                        $stmt->execute();
-                        
-                    } catch (PDOException $e) {
-                        error_log("خطا در ثبت اطلاع‌رسانی شارژ دوبرابر: " . $e->getMessage());
                     }
+                    
+                    // کمی صبر برای جلوگیری از محدودیت تلگرام
+                    sleep(1);
                 }
                 
-                // کمی صبر برای جلوگیری از محدودیت تلگرام
-                sleep(1);
+                sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success) . "\n\n⏱ مهلت استفاده: {$expiry_hours} ساعت", $double_charge_keyboard, 'HTML');
+                step('none', $from_id);
+                
+                // پاک کردن لیست موقت
+                $stmt = $pdo->prepare("DELETE FROM temp_eligible_users WHERE admin_id = :admin_id");
+                $stmt->bindParam(':admin_id', $from_id);
+                $stmt->execute();
+            } else {
+                sendmessage($from_id, "❌ لیست کاربران مشمول در دسترس نیست. لطفاً دوباره لیست را بررسی کنید.", $double_charge_keyboard, 'HTML');
+                step('none', $from_id);
             }
-            
-            sendmessage($from_id, "✅ اطلاع‌رسانی انجام شد!\n\n📊 آمار ارسال:\n▪️ تعداد کل: $count\n▪️ ارسال موفق: $success\n▪️ ارسال ناموفق: " . ($count - $success) . "\n\n⏱ مهلت استفاده: {$expiry_hours} ساعت", $double_charge_keyboard, 'HTML');
-            step('none', $from_id);
-            
-            // پاک کردن سشن
-            unset($_SESSION['eligible_users']);
-        } else {
-            sendmessage($from_id, "❌ لیست کاربران مشمول در دسترس نیست. لطفاً دوباره لیست را بررسی کنید.", $double_charge_keyboard, 'HTML');
+        } catch (PDOException $e) {
+            sendmessage($from_id, "خطا در بازیابی لیست کاربران: " . $e->getMessage(), $double_charge_keyboard, 'HTML');
             step('none', $from_id);
         }
     } else {
