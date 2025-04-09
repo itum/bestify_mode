@@ -2112,8 +2112,6 @@ if ($text == $datatextbot['text_account']) {
     
     // بررسی آیا ستون auto_renewal در جدول وجود دارد
     try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
         $stmt = $pdo->prepare("UPDATE invoice SET auto_renewal = :auto_renewal WHERE username = :username");
         $stmt->bindParam(':auto_renewal', $new_status);
         $stmt->bindParam(':username', $username);
@@ -2635,7 +2633,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             sendmessage($from_id, $textbotlang['users']['sell']['ErrorConfig'], $keyboard, 'HTML');
         }
         
-        $texterros = sprintf($textbotlang['users']['buy']['errorInCreate'], $error_msg, $from_id, $username);
+        $texterros = sprintf($textbotlang['users']['buy']['errorInCreate'], $error_msg, $from_id, isset($username) ? $username : $first_name);
         foreach ($admin_ids as $admin) {
             sendmessage($admin, $texterros, null, 'HTML');
         }
@@ -2650,7 +2648,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         $SellDiscountlimit = select("DiscountSell", "*", "codeDiscount", $partsdic[0], "select");
         $value = intval($SellDiscountlimit['usedDiscount']) + 1;
         update("DiscountSell", "usedDiscount", $value, "codeDiscount", $partsdic[0]);
-        $text_report = sprintf($textbotlang['users']['Report']['discountused'],$username,$from_id,$partsdic[0]);
+        $text_report = sprintf($textbotlang['users']['Report']['discountused'], isset($username) ? $username : $first_name, $from_id, $partsdic[0]);
         if (isset($setting['Channel_Report']) &&strlen($setting['Channel_Report']) > 0) {
             sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
         }
@@ -2732,7 +2730,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         $user['number'],
         $user['Processing_value'],
         is_numeric($user['Balance']) ? number_format($user['Balance'], 0) : 0,
-        $username
+        isset($username) ? $username : $from_id
     );
     if (isset($setting['Channel_Report']) &&strlen($setting['Channel_Report']) > 0) {
         sendmessage($setting['Channel_Report'], $text_report, null, 'HTML');
@@ -2832,15 +2830,11 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
     $double_charge_text = "";
     
     try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
         // بررسی فعال بودن ویژگی شارژ دوبرابر
         if(isset($setting['double_charge_status']) && $setting['double_charge_status'] == 'on') {
             // بررسی اینکه کاربر نماینده نباشد
             $agency_user = false;
             try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
                 $check_agency_table = $pdo->query("SHOW TABLES LIKE 'agency'");
                 if ($check_agency_table && $check_agency_table->rowCount() > 0) {
                     $stmt_agency = $pdo->prepare("SELECT * FROM agency WHERE user_id = :user_id AND status = 'approved'");
@@ -2870,15 +2864,11 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
                     if($meets_purchase_requirement) {
                         // بررسی وجود جدول double_charge_users
                         try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
                             $check_table = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
                             
                             if ($check_table && $check_table->rowCount() > 0) {
                                 // جدول وجود دارد، بررسی کنیم کاربر قبلا استفاده کرده یا نه
                                 try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
                                     $stmt = $pdo->prepare("SELECT * FROM double_charge_users WHERE user_id = :user_id");
                                     $stmt->bindParam(':user_id', $from_id);
                                     $stmt->execute();
@@ -2894,8 +2884,6 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
                                 // جدول وجود ندارد، به اجرای اسکریپت table.php متکی می‌شویم
                                 // طبق بررسی کد، جدول در table.php ایجاد شده است
                                 try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
                                     // یک بار دیگر بررسی می‌کنیم - شاید در این فاصله جدول ایجاد شده باشد
                                     $check_table_again = $pdo->query("SHOW TABLES LIKE 'double_charge_users'");
                                     if ($check_table_again && $check_table_again->rowCount() > 0) {
@@ -3660,12 +3648,7 @@ elseif ($user['step'] == "set_display_name") {
 }
 
 try {
-    $admin_path = __DIR__ . "/admin.php";
-    if (file_exists($admin_path)) {
-    require_once __DIR__ . '/admin.php';
-    } else {
-        error_log("خطا: فایل admin.php در مسیر " . $admin_path . " وجود ندارد.");
-    }
+    require_once 'admin.php';
 } catch (Exception $e) {
     error_log("خطا در لود فایل admin.php: " . $e->getMessage());
 }
@@ -3764,7 +3747,7 @@ elseif ($datain == 'search_expired') {
                 if (isset($DataUserOut['expire'])) {
                     if ($DataUserOut['expire'] <= time()) {
                         $is_expired = true;
-    } else {
+                    } else {
                         $days_left = floor(($DataUserOut['expire'] - time()) / 86400);
                     }
                 }
