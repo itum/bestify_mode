@@ -21,6 +21,14 @@ class ManagePanel{
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel,"select");
         $expire = $Data_Config['expire'];
         $data_limit = $Data_Config['data_limit'];
+        if($Get_Data_Panel === false) {
+            $Output = array(
+                'status' => 'Unsuccessful',
+                'msg' => 'Panel Not Found'
+            );
+            return $Output;
+        }
+        
         if($Get_Data_Panel['type'] == "marzban"){
             //create user
             $ConnectToPanel= adduser($usernameC,$expire,$data_limit,$Get_Data_Panel['name_panel']);
@@ -113,6 +121,14 @@ class ManagePanel{
         $Output = array();
         global $connect;
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel,"select");
+        if($Get_Data_Panel === false) {
+            $Output = array(
+                'status' => 'Unsuccessful',
+                'msg' => 'Panel Not Found'
+            );
+            return $Output;
+        }
+        
         if($Get_Data_Panel['type'] == "marzban"){
             $UsernameData = getuser($username,$Get_Data_Panel['name_panel']);
             if(isset($UsernameData['detail']) && $UsernameData['detail']){
@@ -123,7 +139,7 @@ class ManagePanel{
             }elseif(!isset($UsernameData['username'])){
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['detail']
+                    'msg' => isset($UsernameData['detail']) ? $UsernameData['detail'] : 'Username not found'
                 );
             }else{
                 if (!preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?((\/[^\s\/]+)+)?$/', $UsernameData['subscription_url'])) {
@@ -155,7 +171,7 @@ class ManagePanel{
                     'msg' => ""
                 );
             }else{
-                if (!preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?((\/[^\s\/]+)+)?$/', $UsernameData['subscription_url'])){
+                if (isset($UsernameData['subscription_url']) && !preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?((\/[^\s\/]+)+)?$/', $UsernameData['subscription_url'])){
                     $UsernameData['subscription_url'] = $Get_Data_Panel['url_panel'] . "/" . ltrim($UsernameData['subscription_url'], "/");
                 }
                 $UsernameData['status']  = "active";
@@ -192,20 +208,20 @@ class ManagePanel{
         elseif($Get_Data_Panel['type'] == "x-ui_single"){
             $UsernameData = get_Client($username,$Get_Data_Panel['name_panel']);
             $UsernameData2 = get_clinets($username,$Get_Data_Panel['name_panel']);
-            $expire = $UsernameData['expiryTime']/1000;
-            if(!$UsernameData['id']){
-                if(empty($UsernameData['msg']))$UsernameData['msg'] = "";
+            
+            if(!isset($UsernameData['id']) || !$UsernameData['id']){
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => isset($UsernameData['msg']) ? $UsernameData['msg'] : "User not found"
                 );
             }else{
+                $expire = isset($UsernameData['expiryTime']) ? $UsernameData['expiryTime']/1000 : 0;
                 if($UsernameData['enable']){
                     $UsernameData['enable'] = "active";
                 }else{
                     $UsernameData['enable'] = "disabled";
                 }
-                if(intval($UsernameData['expiryTime']) != 0){
+                if(isset($UsernameData['expiryTime']) && intval($UsernameData['expiryTime']) != 0){
                     if($expire - time() <=0 )$UsernameData['enable'] = "expired";
                 }
                 $subId = $UsernameData2['subId'];
@@ -224,30 +240,47 @@ class ManagePanel{
             }
         }
         elseif($Get_Data_Panel['type'] == "alireza"){
-            $UsernameData = get_Clientalireza($username,$Get_Data_Panel['name_panel']);
-            $UsernameData2 = get_clinetsalireza($username,$Get_Data_Panel['name_panel']);
-            if(!$UsernameData['id']){
+            $clients = get_clinetsalireza($username,$name_panel);
+            if(!$clients || !is_array($clients)) {
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => 'Client data not found'
+                );
+                return $Output;
+            }
+            
+            $subId = bin2hex(random_bytes(8));
+            $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+            $linksub = "{$linksubx}/{$subId}/?name=$username";
+            
+            $inboundid = isset($Get_Data_Panel['inboundid']) ? $Get_Data_Panel['inboundid'] : 0;
+            
+            $config = array(
+                'id' => intval($inboundid),
+                'settings' => json_encode(array(
+                        'clients' => array(
+                            array(
+                                "id" => generateUUID(),
+                                "flow" => isset($clients['flow']) ? $clients['flow'] : '',
+                                "email" => isset($clients['email']) ? $clients['email'] : $username,
+                                "totalGB" => isset($clients['totalGB']) ? $clients['totalGB'] : 0,
+                                "expiryTime" => isset($clients['expiryTime']) ? $clients['expiryTime'] : 0,
+                                "enable" => true,
+                                "subId" => $subId,
+                            )),
+                    )
+                )
+            );
+            $updateinbound = updateClientalireza($Get_Data_Panel['name_panel'],$username,$config);
+            if(!$clients){
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => 'Unsuccessful'
                 );
             }else{
-                if($UsernameData['enable']){
-                    $UsernameData['enable'] = "active";
-                }else{
-                    $UsernameData['enable'] = "disabled";
-                }
-                $subId = $UsernameData2['subId'];
-                $status_user = get_onlinecli($Get_Data_Panel['name_panel'],$username);
-                $linksub = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$username";
                 $Output = array(
-                    'status' => $UsernameData['enable'],
-                    'username' => $UsernameData['email'],
-                    'data_limit' => $UsernameData['total'],
-                    'expire' => $UsernameData['expiryTime']/1000,
-                    'online_at' => $status_user,
-                    'used_traffic' => $UsernameData['up']+$UsernameData['down'],
-                    'links' => [outputlunk($linksub)],
+                    'status' => 'successful',
+                    'configs' => outputlunk($linksub),
                     'subscription_url' => $linksub,
                 );
             }
@@ -258,7 +291,7 @@ class ManagePanel{
             if(!isset($UsernameData['id'])){
                 $Output = array(
                     'status' => 'Unsuccessful',
-                    'msg' => $UsernameData['msg']
+                    'msg' => isset($UsernameData['msg']) ? $UsernameData['msg'] : "User not found"
                 );}
             else{
                 $links = [];
@@ -306,6 +339,14 @@ class ManagePanel{
         $Output = array();
         global $connect;
         $Get_Data_Panel = select("marzban_panel", "*", "name_panel", $name_panel,"select");
+        if($Get_Data_Panel === false) {
+            $Output = array(
+                'status' => 'Unsuccessful',
+                'msg' => 'Panel Not Found'
+            );
+            return $Output;
+        }
+        
         if($Get_Data_Panel['type'] == "marzban"){
             $revoke_sub = revoke_sub($username,$name_panel);
             if(isset($revoke_sub['detail']) && $revoke_sub['detail']){
@@ -316,13 +357,13 @@ class ManagePanel{
             }else{
                 $config = new ManagePanel();
                 $Data_User  = $config->DataUser($name_panel,$username);
-                if (!preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?((\/[^\s\/]+)+)?$/', $Data_User['subscription_url'])) {
+                if (isset($Data_User['subscription_url']) && !preg_match('/^(https?:\/\/)?([a-zA-Z0-9-]+\.)+[a-zA-Z]{2,}(:\d+)?((\/[^\s\/]+)+)?$/', $Data_User['subscription_url'])) {
                     $Data_User['subscription_url'] = $Get_Data_Panel['url_panel'] . "/" . ltrim($Data_User['subscription_url'], "/");
                 }
                 $Output = array(
                     'status' => 'successful',
-                    'configs' => $Data_User['links'],
-                    'subscription_url' => $Data_User['subscription_url']
+                    'configs' => isset($Data_User['links']) ? $Data_User['links'] : [],
+                    'subscription_url' => isset($Data_User['subscription_url']) ? $Data_User['subscription_url'] : ''
                 );
             }
         }
@@ -336,28 +377,47 @@ class ManagePanel{
             }else{
                 $config = new ManagePanel();
                 $Data_User  = $config->DataUser($name_panel,$username);
-                $Data_User['links'] = [base64_decode(outputlunk($Data_User['subscription_url']))];
-                $Output = array(
-                    'status' => 'successful',
-                    'configs' => $Data_User['links'],
-                    'subscription_url' => $Data_User['subscription_url']
-                );
+                if(isset($Data_User['subscription_url'])) {
+                    $Data_User['links'] = [base64_decode(outputlunk($Data_User['subscription_url']))];
+                    $Output = array(
+                        'status' => 'successful',
+                        'configs' => $Data_User['links'],
+                        'subscription_url' => $Data_User['subscription_url']
+                    );
+                } else {
+                    $Output = array(
+                        'status' => 'Unsuccessful',
+                        'msg' => 'Subscription URL not found'
+                    );
+                }
             }
         }
         elseif($Get_Data_Panel['type'] == "x-ui_single"){
             $clients = get_clinets($username,$name_panel);
+            if(!$clients || !is_array($clients)) {
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => 'Client data not found'
+                );
+                return $Output;
+            }
+            
             $subId = bin2hex(random_bytes(8));
-            $linksub = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$username";
+            $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+            $linksub = "{$linksubx}/{$subId}/?name=$username";
+            
+            $inboundid = isset($Get_Data_Panel['inboundid']) ? $Get_Data_Panel['inboundid'] : 0;
+            
             $config = array(
-                'id' => intval($Get_Data_Panel['inboundid']),
+                'id' => intval($inboundid),
                 'settings' => json_encode(array(
                         'clients' => array(
                             array(
                                 "id" => generateUUID(),
-                                "flow" => $clients['flow'],
-                                "email" => $clients['email'],
-                                "totalGB" => $clients['totalGB'],
-                                "expiryTime" => $clients['expiryTime'],
+                                "flow" => isset($clients['flow']) ? $clients['flow'] : '',
+                                "email" => isset($clients['email']) ? $clients['email'] : $username,
+                                "totalGB" => isset($clients['totalGB']) ? $clients['totalGB'] : 0,
+                                "expiryTime" => isset($clients['expiryTime']) ? $clients['expiryTime'] : 0,
                                 "enable" => true,
                                 "subId" => $subId,
                             )),
@@ -380,18 +440,30 @@ class ManagePanel{
         }
         elseif($Get_Data_Panel['type'] == "alireza"){
             $clients = get_clinetsalireza($username,$name_panel);
+            if(!$clients || !is_array($clients)) {
+                $Output = array(
+                    'status' => 'Unsuccessful',
+                    'msg' => 'Client data not found'
+                );
+                return $Output;
+            }
+            
             $subId = bin2hex(random_bytes(8));
-            $linksub = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$username";
+            $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+            $linksub = "{$linksubx}/{$subId}/?name=$username";
+            
+            $inboundid = isset($Get_Data_Panel['inboundid']) ? $Get_Data_Panel['inboundid'] : 0;
+            
             $config = array(
-                'id' => intval($Get_Data_Panel['inboundid']),
+                'id' => intval($inboundid),
                 'settings' => json_encode(array(
                         'clients' => array(
                             array(
                                 "id" => generateUUID(),
-                                "flow" => $clients['flow'],
-                                "email" => $clients['email'],
-                                "totalGB" => $clients['totalGB'],
-                                "expiryTime" => $clients['expiryTime'],
+                                "flow" => isset($clients['flow']) ? $clients['flow'] : '',
+                                "email" => isset($clients['email']) ? $clients['email'] : $username,
+                                "totalGB" => isset($clients['totalGB']) ? $clients['totalGB'] : 0,
+                                "expiryTime" => isset($clients['expiryTime']) ? $clients['expiryTime'] : 0,
                                 "enable" => true,
                                 "subId" => $subId,
                             )),
