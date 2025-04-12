@@ -6,6 +6,7 @@ require_once 'x-ui_single.php';
 require_once 'marzneshin.php';
 require_once 'alireza_single.php';
 require_once 's_ui.php';
+require_once 'wgdashboard.php';
 class ManagePanel{
     public $name_panel;
     public $connect;
