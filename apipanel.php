@@ -63,10 +63,16 @@ function getuser($usernameac,$location)
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_HTTPGET, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token']
-    ));
+    
+    $headers = ['Accept: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     curl_close($ch);
@@ -85,10 +91,16 @@ function ResetUserDataUsage($usernameac,$location)
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST , true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token']
-    ));
+    
+    $headers = ['Accept: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     curl_close($ch);
@@ -127,11 +139,16 @@ function adduser($username,$expire,$data_limit,$location)
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token'],
-        'Content-Type: application/json'
-    ));
+    
+    $headers = ['Accept: application/json', 'Content-Type: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return json_encode(['detail' => 'Access token not available']);
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
     $response = curl_exec($ch);
@@ -150,10 +167,16 @@ function Get_System_Stats($location){
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_HTTPGET, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token'],
-    ));
+    
+    $headers = ['Accept: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     curl_close($ch);
@@ -173,10 +196,16 @@ function removeuser($location,$username)
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'DELETE');
     curl_setopt($ch, CURLOPT_HTTPGET, true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token']
-    ));
+    
+    $headers = ['Accept: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     curl_close($ch);
@@ -195,10 +224,18 @@ function Modifyuser($location,$username,array $data)
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
     curl_setopt($ch, CURLOPT_CUSTOMREQUEST, 'PUT');
     curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
-    $headers = array();
+    
+    $headers = [];
     $headers[] = 'Accept: application/json';
-    $headers[] = 'Authorization: Bearer '.$Check_token['access_token'];
     $headers[] = 'Content-Type: application/json';
+    
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: Bearer ' . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
     curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $result = curl_exec($ch);
@@ -221,10 +258,16 @@ function revoke_sub($username,$location)
     curl_setopt($ch, CURLOPT_URL, $url);
     curl_setopt($ch, CURLOPT_POST , true);
     curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-    curl_setopt($ch, CURLOPT_HTTPHEADER, array(
-        'Accept: application/json',
-        'Authorization: ' . $header_value .  $Check_token['access_token']
-    ));
+    
+    $headers = ['Accept: application/json'];
+    if (isset($Check_token['access_token'])) {
+        $headers[] = 'Authorization: ' . $header_value . $Check_token['access_token'];
+    } else {
+        // در صورت عدم وجود توکن، خطایی را برگردان
+        return ['detail' => 'Access token not available'];
+    }
+    
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
 
     $output = curl_exec($ch);
     curl_close($ch);

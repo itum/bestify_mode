@@ -1516,7 +1516,7 @@ if ($user['step'] == "createusertest" || preg_match('/locationtests_(.*)/', $dat
     }
     $date = time();
     $randomString = bin2hex(random_bytes(2));
-    $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, display_name, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $Status = "active";
     $usertest = "usertest";
     $price = "0";
@@ -1530,7 +1530,8 @@ if ($user['step'] == "createusertest" || preg_match('/locationtests_(.*)/', $dat
     $stmt->bindParam(7, $price);
     $stmt->bindParam(8, $setting['val_usertest']);
     $stmt->bindParam(9, $setting['time_usertest']);
-    $stmt->bindParam(10, $Status);
+    $stmt->bindParam(10, $username_ac, PDO::PARAM_STR);
+    $stmt->bindParam(11, $Status);
     $stmt->execute();
     $text_config = "";
     $output_config_link = "";
@@ -1950,9 +1951,9 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
             step('get_step_payment', $from_id);
             
             // ایجاد فاکتور پرداخت نشده
-            $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, display_name, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
             $Status = "unpaid";
-            $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $priceproduct, $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
+            $stmt->bind_param("sssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $priceproduct, $info_product['Volume_constraint'], $info_product['Service_time'], $username_ac, $Status);
             $stmt->execute();
             $stmt->close();
             
@@ -1972,7 +1973,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         update("agency", "income", $agencyIncome, "user_id", $from_id);
         
         // ثبت سرویس خریداری شده
-        $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+        $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, display_name, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
         $Status = "active";
         $stmt = $pdo->prepare($sql);
         $stmt->bindParam(1, $from_id);
@@ -1984,7 +1985,8 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         $stmt->bindParam(7, $priceproduct);
         $stmt->bindParam(8, $info_product['Volume_constraint']);
         $stmt->bindParam(9, $info_product['Service_time']);
-        $stmt->bindParam(10, $Status);
+        $stmt->bindParam(10, $username_ac, PDO::PARAM_STR);
+        $stmt->bindParam(11, $Status);
         $stmt->execute();
         
     } elseif ($datain == "confirmandgetserviceDiscount") {
@@ -2053,9 +2055,9 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         
         sendmessage($from_id, $error_message, $step_payment, 'HTML');
         step('get_step_payment', $from_id);
-        $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time,Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?,?,?)");
+        $stmt = $connect->prepare("INSERT IGNORE INTO invoice(id_user, id_invoice, username,time_sell, Service_location, name_product, price_product, Volume, Service_time, display_name, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $Status =  "unpaid";
-        $stmt->bind_param("ssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $Status);
+        $stmt->bind_param("sssssssssss", $from_id, $randomString, $username_ac, $date, $marzban_list_get['name_panel'], $info_product['name_product'], $info_product['price_product'], $info_product['Volume_constraint'], $info_product['Service_time'], $username_ac, $Status);
         $stmt->execute();
         $stmt->close();
         update("user","Processing_value_one",$username_ac, "id",$from_id);
@@ -2065,7 +2067,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     if (in_array($randomString, $id_invoice)) {
         $randomString = $random_number . $randomString;
     }
-    $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
+    $sql = "INSERT IGNORE INTO invoice (id_user, id_invoice, username, time_sell, Service_location, name_product, price_product, Volume, Service_time, display_name, Status) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)";
     $Status = "active";
     $stmt = $pdo->prepare($sql);
     $stmt->bindParam(1, $from_id);
@@ -2077,7 +2079,8 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     $stmt->bindParam(7, $info_product['price_product']);
     $stmt->bindParam(8, $info_product['Volume_constraint']);
     $stmt->bindParam(9, $info_product['Service_time']);
-    $stmt->bindParam(10, $Status);
+    $stmt->bindParam(10, $username_ac, PDO::PARAM_STR);
+    $stmt->bindParam(11, $Status);
     $stmt->execute();
     if($info_product['Service_time'] == "0"){
         $data = "0";
@@ -2420,7 +2423,7 @@ if ($text == $datatextbot['text_Add_Balance'] || $text == "/wallet") {
         $paymentkeyboard = json_encode([
             'inline_keyboard' => [
                 [
-                    ['text' => $textbotlang['users']['Balance']['payments'], 'url' => "https://" . "$domainhosts" . "/payment/nowpayments/nowpayments.php?price=$usdprice&order_description=Add_Balance&order_id=$randomString"],
+                    ['text' => $textbotlang['users']['Balance']['payments'], 'url' => "https://" . "$domainhosts" . "/payment/nowpayments/nowpayments.php?price=$usdprice&order_id=$randomString"],
                 ]
             ]
         ]);
