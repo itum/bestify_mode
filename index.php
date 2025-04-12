@@ -52,7 +52,8 @@ if (intval($from_id) != 0) {
     }else{
         $verify = 1;
     }
-    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates,verify) VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0', '0',:verify)");
+    $stmt = $pdo->prepare("INSERT IGNORE INTO user (id, step, limit_usertest, User_Status, number, Balance, pagenumber, username, message_count, last_message_time, affiliatescount, affiliates, verify, Processing_value, Processing_value_one, Processing_value_tow, Processing_value_four, roll_Status) 
+    VALUES (:from_id, 'none', :limit_usertest_all, 'Active', 'none', '0', '1', :username, '0', '0', '0', '0', :verify, 'none', 'none', 'none', 'none', 0)");
     $stmt->bindParam(':verify', $verify);
     $stmt->bindParam(':from_id', $from_id);
     $stmt->bindParam(':limit_usertest_all', $setting['limit_usertest_all']);
@@ -2316,7 +2317,7 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
         return;
     }
     
-    if ($marzban_list_get['linksubx'] == null && in_array($marzban_list_get['type'], ["x-ui_single", "alireza"])) {
+    if (!isset($marzban_list_get['linksubx']) || $marzban_list_get['linksubx'] == null && in_array($marzban_list_get['type'], ["x-ui_single", "alireza"])) {
         foreach ($admin_ids as $admin) {
             sendmessage($admin, sprintf($textbotlang['Admin']['managepanel']['notsetlinksub'], $marzban_list_get['name_panel']), null, 'HTML');
         }
@@ -2326,9 +2327,9 @@ if ($text == $datatextbot['text_sell'] || $datain == "buy" || $text == "/buy") {
     
     // دریافت اطلاعات نمایندگی کاربر
     $checkAgency = select("agency", "*", "user_id", $from_id, "select");
-    if ($checkAgency && $checkAgency['status'] == 'approved') {
+    if ($checkAgency && isset($checkAgency['status']) && $checkAgency['status'] == 'approved') {
         $hasAgencyDiscount = true;
-        $agencyDiscount = $checkAgency['discount_percent'];
+        $agencyDiscount = isset($checkAgency['discount_percent']) ? $checkAgency['discount_percent'] : 0;
         $agency_discount_code = "agency_" . $agencyDiscount;
     }
     

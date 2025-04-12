@@ -3249,9 +3249,9 @@ elseif ($user['step'] == "notify_double_charge_users") {
                         $stmt = $pdo->prepare("INSERT INTO double_charge_notifications (user_id, notified_at, expiry_at, expiry_hours) 
                                            VALUES (:user_id, :notified_at, :expiry_at, :expiry_hours)
                                            ON DUPLICATE KEY UPDATE 
-                                           notified_at = :notified_at,
-                                           expiry_at = :expiry_at,
-                                           expiry_hours = :expiry_hours");
+                                           notified_at = VALUES(notified_at),
+                                           expiry_at = VALUES(expiry_at),
+                                           expiry_hours = VALUES(expiry_hours)");
                         
                         $stmt->bindParam(':user_id', $user_id);
                         $stmt->bindParam(':notified_at', $notified_at);

@@ -80,7 +80,8 @@ class ManagePanel{
             }else{
                 $Output['status'] = 'successful';
                 $Output['username'] = $usernameC;
-                $Output['subscription_url'] = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$usernameC";
+                $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+                $Output['subscription_url'] = "{$linksubx}/{$subId}/?name=$usernameC";
                 $Output['configs'] = [outputlunk($Output['subscription_url'])];
             }
         }
@@ -94,7 +95,8 @@ class ManagePanel{
             }else{
                 $Output['status'] = 'successful';
                 $Output['username'] = $usernameC;
-                $Output['subscription_url'] = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$usernameC";
+                $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+                $Output['subscription_url'] = "{$linksubx}/{$subId}/?name=$usernameC";
                 $Output['configs'] = [outputlunk($Output['subscription_url'])];
             }
         }
@@ -106,10 +108,10 @@ class ManagePanel{
             }else{
                 $Output['status'] = 'successful';
                 $Output['username'] = $usernameC;
-                $Output['subscription_url'] = $Get_Data_Panel['linksubx']."/$usernameC";
-                $Output['configs'] = [outputlunk($Get_Data_Panel['linksubx']."/$usernameC")];
+                $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+                $Output['subscription_url'] = $linksubx."/$usernameC";
+                $Output['configs'] = [outputlunk($linksubx."/$usernameC")];
             }
-
         }
         else{
             $Output['status'] = 'Unsuccessful';
@@ -226,7 +228,8 @@ class ManagePanel{
                 }
                 $subId = $UsernameData2['subId'];
                 $status_user = get_onlinecli($Get_Data_Panel['name_panel'],$username);
-                $linksub = "{$Get_Data_Panel['linksubx']}/{$subId}/?name=$username";
+                $linksubx = isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx'] : '';
+                $linksub = "{$linksubx}/{$subId}/?name=$username";
                 $Output = array(
                     'status' => $UsernameData['enable'],
                     'username' => $UsernameData['email'],
@@ -321,7 +324,7 @@ class ManagePanel{
                     'online_at' => $onlinestatus,
                     'used_traffic' => $useage,
                     'links' => $links,
-                    'subscription_url' => $Get_Data_Panel['linksubx']."/{$UsernameData['name']}",
+                    'subscription_url' => isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx']."/{$UsernameData['name']}" : "",
                     'sub_updated_at' => null,
                     'sub_last_user_agent'=> null,
                 );
@@ -555,8 +558,8 @@ class ManagePanel{
             }else{
                 $Output = array(
                     'status' => 'successful',
-                    'configs' => [outputlunk($Get_Data_Panel['linksubx']."/{$usernameac}")],
-                    'subscription_url' => $Get_Data_Panel['linksubx']."/{$usernameac}",
+                    'configs' => [outputlunk(isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx']."/{$usernameac}" : "/{$usernameac}")],
+                    'subscription_url' => isset($Get_Data_Panel['linksubx']) ? $Get_Data_Panel['linksubx']."/{$usernameac}" : "/{$usernameac}",
                 );
             }
         }
